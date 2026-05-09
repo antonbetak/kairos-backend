@@ -312,6 +312,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 4. Cuando Google redirija a `/auth/google/callback?code=...&state=...`, copia la URL completa.
 5. Pega esa URL en Thunder Client y envia el GET para ver el JSON final.
 6. Para refrescar, envia un POST a `http://localhost:8000/auth/google/refresh` con body JSON: `{"refresh_token":"..."}`.
+7. Para ver el usuario actual, envia un GET a `http://localhost:8000/auth/google/me` con header `Authorization: Bearer <access_token>`.
 
 
 ## Endpoints principales
@@ -319,6 +320,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 - `GET /auth/google/login` — inicia el flujo, redirige a Google.
 - `GET /auth/google/callback` — callback que devuelve JSON con `user` y `tokens`.
 - `POST /auth/google/refresh` — refresca el `access_token` usando `refresh_token`.
+- `GET /auth/google/me` — devuelve el perfil del usuario usando `access_token` o `id_token`.
 - `GET /health` — healthcheck.
 - `GET /` — información básica del servicio.
 

@@ -24,6 +24,11 @@ class GoogleAuthResponse(BaseModel):
     tokens: GoogleTokenSet
 
 
+class GoogleMeResponse(BaseModel):
+    provider: str = "google"
+    user: GoogleUserProfile
+
+
 class GoogleRefreshRequest(BaseModel):
     refresh_token: str
 

@@ -1,34 +1,81 @@
 import json
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
 	model_config = SettingsConfigDict(
-		env_file=(".env",),
+		env_file=".env",
 		env_file_encoding="utf-8",
 		extra="ignore",
+		populate_by_name=True,
 		case_sensitive=False,
 	)
 
-	app_name: str = "google_auth_service"
-	app_env: str = "development"
-	log_level: str = "INFO"
-	host: str = "0.0.0.0"
-	port: int = 8000
+	app_name: str = Field(
+		default="google_auth_service",
+		validation_alias=AliasChoices("APP_NAME", "app_name"),
+	)
+	app_env: str = Field(
+		default="development",
+		validation_alias=AliasChoices("APP_ENV", "app_env"),
+	)
+	log_level: str = Field(
+		default="INFO",
+		validation_alias=AliasChoices("APP_LOG_LEVEL", "log_level"),
+	)
+	host: str = Field(
+		default="0.0.0.0",
+		validation_alias=AliasChoices("APP_HOST", "host"),
+	)
+	port: int = Field(
+		default=8000,
+		validation_alias=AliasChoices("APP_PORT", "port"),
+	)
 
-	cors_origins: str = ""
+	cors_origins: str = Field(
+		default="",
+		validation_alias=AliasChoices("CORS_ORIGINS", "cors_origins"),
+	)
 
-	google_client_id: str
-	google_client_secret: str
-	google_redirect_uri: str
-	google_auth_uri: str = "https://accounts.google.com/o/oauth2/v2/auth"
-	google_token_uri: str = "https://oauth2.googleapis.com/token"
-	google_userinfo_uri: str = "https://openidconnect.googleapis.com/v1/userinfo"
-	google_scope: str = "openid email profile"
-	state_ttl_seconds: int = 600
-	clock_skew_seconds: int = 10
+	google_client_id: str = Field(
+		...,
+		validation_alias=AliasChoices("GOOGLE_CLIENT_ID", "google_client_id"),
+	)
+	google_client_secret: str = Field(
+		...,
+		validation_alias=AliasChoices("GOOGLE_CLIENT_SECRET", "google_client_secret"),
+	)
+	google_redirect_uri: str = Field(
+		...,
+		validation_alias=AliasChoices("GOOGLE_REDIRECT_URI", "google_redirect_uri"),
+	)
+	google_auth_uri: str = Field(
+		default="https://accounts.google.com/o/oauth2/v2/auth",
+		validation_alias=AliasChoices("GOOGLE_AUTH_URI", "google_auth_uri"),
+	)
+	google_token_uri: str = Field(
+		default="https://oauth2.googleapis.com/token",
+		validation_alias=AliasChoices("GOOGLE_TOKEN_URI", "google_token_uri"),
+	)
+	google_userinfo_uri: str = Field(
+		default="https://openidconnect.googleapis.com/v1/userinfo",
+		validation_alias=AliasChoices("GOOGLE_USERINFO_URI", "google_userinfo_uri"),
+	)
+	google_scope: str = Field(
+		default="openid email profile",
+		validation_alias=AliasChoices("GOOGLE_SCOPE", "google_scope"),
+	)
+	state_ttl_seconds: int = Field(
+		default=600,
+		validation_alias=AliasChoices("STATE_TTL_SECONDS", "state_ttl_seconds"),
+	)
+	clock_skew_seconds: int = Field(
+		default=10,
+		validation_alias=AliasChoices("CLOCK_SKEW_SECONDS", "clock_skew_seconds"),
+	)
 
 	def cors_origins_list(self) -> list[str]:
 		default_origins = [

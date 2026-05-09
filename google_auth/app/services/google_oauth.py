@@ -108,7 +108,7 @@ class GoogleOAuthService:
 
         return tokens
 
-    def verify_id_token(self, token: str, expected_nonce: str) -> dict[str, object]:
+    def verify_id_token(self, token: str, expected_nonce: str | None = None) -> dict[str, object]:
         request = Request()
 
         try:
@@ -125,13 +125,29 @@ class GoogleOAuthService:
                 detail="El id_token de Google no es válido.",
             ) from exc
 
-        if claims.get("nonce") != expected_nonce:
+        if expected_nonce and claims.get("nonce") != expected_nonce:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="El nonce del token no coincide con la autenticación iniciada.",
             )
 
         return claims
+
+    async def get_current_user(self, token: str) -> GoogleUserProfile:
+        try:
+            claims = self.verify_id_token(token)
+            return self._build_user_profile(claims)
+        except HTTPException:
+            pass
+
+        userinfo = await self.fetch_userinfo(token)
+        if not userinfo:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="El token de Google no es válido.",
+            )
+
+        return self._build_user_profile(userinfo)
 
     async def fetch_userinfo(self, access_token: str) -> dict[str, object]:
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -167,25 +183,9 @@ class GoogleOAuthService:
         id_token_claims = self.verify_id_token(id_token_value, state_payload.nonce)
         userinfo = await self.fetch_userinfo(access_token)
 
-        email = str(userinfo.get("email") or id_token_claims.get("email") or "").strip()
-        name = str(userinfo.get("name") or id_token_claims.get("name") or "").strip()
-        picture = userinfo.get("picture") or id_token_claims.get("picture")
-        google_id = str(userinfo.get("sub") or id_token_claims.get("sub") or "").strip()
-        email_verified = bool(userinfo.get("email_verified", id_token_claims.get("email_verified", False)))
-
-        if not email or not name or not google_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No fue posible obtener los datos básicos del usuario autenticado.",
-            )
-
-        user = GoogleUserProfile(
-            email=email,
-            name=name,
-            picture=str(picture) if picture else None,
-            google_id=google_id,
-            email_verified=email_verified,
-        )
+        combined = dict(id_token_claims)
+        combined.update(userinfo or {})
+        user = self._build_user_profile(combined)
 
         tokens = GoogleTokenSet(
             access_token=access_token,
@@ -197,6 +197,27 @@ class GoogleOAuthService:
         )
 
         return GoogleAuthResponse(user=user, tokens=tokens)
+
+    def _build_user_profile(self, data: dict[str, object]) -> GoogleUserProfile:
+        email = str(data.get("email") or "").strip()
+        name = str(data.get("name") or "").strip()
+        picture = data.get("picture")
+        google_id = str(data.get("sub") or data.get("google_id") or "").strip()
+        email_verified = bool(data.get("email_verified", False))
+
+        if not email or not name or not google_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No fue posible obtener los datos básicos del usuario autenticado.",
+            )
+
+        return GoogleUserProfile(
+            email=email,
+            name=name,
+            picture=str(picture) if picture else None,
+            google_id=google_id,
+            email_verified=email_verified,
+        )
 
     def _create_state(self) -> str:
         payload = StatePayload(nonce=secrets.token_urlsafe(24), issued_at=int(time.time()))
