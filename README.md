@@ -45,36 +45,17 @@ El microservicio `google_auth`, responsable únicamente del proceso de autentica
 3. Busca "Google+ API" y haz clic en ella.
 4. Haz clic en "HABILITAR".
 
-### Paso 3: Configurar la pantalla de consentimiento OAuth
-
 1. Ve a **APIs y servicios > Pantalla de consentimiento OAuth**.
 2. Selecciona "Externo" como tipo de usuario.
 3. Haz clic en "CREAR".
-4. Rellena los campos requeridos:
    - **Nombre de la aplicación**: tu nombre de app (ej. "Kairos Google Auth")
    - **Email de asistencia**: tu email
-   - **Datos de contacto del desarrollador**: tu email
-5. Haz clic en "GUARDAR Y CONTINUAR".
 6. En la sección de "Permisos", haz clic en "AGREGAR O ELIMINAR PERMISOS".
 7. En la caja de búsqueda, busca y selecciona estos permisos:
    - `openid`
-   - `https://www.googleapis.com/auth/userinfo.email`
-   - `https://www.googleapis.com/auth/userinfo.profile`
-8. Haz clic en "ACTUALIZAR".
-9. Haz clic en "GUARDAR Y CONTINUAR".
-10. En "Usuarios de prueba", puedes agregar tus cuentas de Google para probar (opcional).
-11. Haz clic en "GUARDAR Y CONTINUAR".
 
 ### Paso 4: Crear credenciales OAuth2
 
-#### 4.1 - Credencial para Backend (Web)
-
-1. Ve a **APIs y servicios > Credenciales**.
-2. Haz clic en "CREAR CREDENCIALES" en la barra superior.
-3. Selecciona "ID de cliente OAuth".
-4. Elige **Tipo de aplicación: Aplicación web**.
-5. Asigna un nombre (ej. "Kairos Backend API").
-6. Bajo **URI de redirección autorizados**, agrega:
    - Desarrollo: `http://localhost:8000/auth/google/callback`
    - Staging: `https://staging-api.tu-dominio.com/auth/google/callback`
    - Producción: `https://api.tu-dominio.com/auth/google/callback`
@@ -83,24 +64,18 @@ El microservicio `google_auth`, responsable únicamente del proceso de autentica
    - `ID de cliente` (GOOGLE_CLIENT_ID)
    - `Secreto de cliente` (GOOGLE_CLIENT_SECRET)
 9. **Copia estos valores** — los necesitarás en las variables de entorno del backend.
-10. Haz clic en "CERRAR".
-
 #### 4.2 - Credencial para iOS (Expo/EAS)
 
 1. Nuevamente en **Credenciales**, haz clic en "CREAR CREDENCIALES".
 2. Selecciona "ID de cliente OAuth".
 3. Elige **Tipo de aplicación: Aplicación de iOS**.
 4. Asigna un nombre (ej. "Kairos Mobile iOS").
-5. En **Bundle ID**, ingresa tu Bundle ID de Expo. Puedes encontrarlo en:
-   - `app.json` (campo `ios.bundleIdentifier`)
    - Si no lo has configurado, usa: `com.yourcompany.kairos` (reemplaza `yourcompany` con tu nombre)
 6. En **ID de equipo**, déjalo vacío (si no tienes Apple Developer Team ID).
 7. Haz clic en "CREAR".
 8. Copia el `ID de cliente` que se genera (para uso en la app móvil).
 
 #### 4.3 - Credencial para Android (Expo/EAS)
-
-1. Nuevamente en **Credenciales**, haz clic en "CREAR CREDENCIALES".
 2. Selecciona "ID de cliente OAuth".
 3. Elige **Tipo de aplicación: Aplicación de Android**.
 4. Asigna un nombre (ej. "Kairos Mobile Android").
@@ -246,44 +221,6 @@ eas submit --platform android --latest
 eas submit --platform ios --latest
 ```
 
-
-## Variables de entorno del Backend
-
-Copia el archivo `.env.example` a `.env` (o `.env.dev` para desarrollo) y rellena los valores con las credenciales web obtenidas en el **Paso 4.1**:
-
-```bash
-cp .env.example .env
-```
-
-Edita `.env` con tus credenciales:
-
-```env
-APP_NAME=google_auth_service
-APP_ENV=development
-APP_PORT=8000
-APP_HOST=0.0.0.0
-APP_LOG_LEVEL=INFO
-
-# Origenes permitidos (coma-separados)
-CORS_ORIGINS=http://localhost:3000
-# Tambien puedes usar JSON:
-# CORS_ORIGINS=["http://localhost:3000","http://localhost:19006"]
-
-# Credenciales obtenidas de Google Cloud Console
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:8000/auth/google/callback
-
-# Endpoints de Google OAuth (estandar, no cambiar)
-GOOGLE_AUTH_URI=https://accounts.google.com/o/oauth2/v2/auth
-GOOGLE_TOKEN_URI=https://oauth2.googleapis.com/token
-GOOGLE_USERINFO_URI=https://openidconnect.googleapis.com/v1/userinfo
-GOOGLE_SCOPE=openid email profile
-
-# Duracion del state token (en segundos)
-STATE_TTL_SECONDS=600
-```
-
 ## Ejecutar y probar
 
 ### Docker (desarrollo)
@@ -303,17 +240,6 @@ curl http://localhost:8000/health
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
-
-### Probar sin frontend (Thunder Client o Postman)
-
-1. Crea un GET a `http://localhost:8000/health` y confirma `status: ok`.
-2. Crea un GET a `http://localhost:8000/auth/google/login` con "Follow redirects" desactivado.
-3. Copia el header `Location` y abre esa URL en el navegador para hacer login.
-4. Cuando Google redirija a `/auth/google/callback?code=...&state=...`, copia la URL completa.
-5. Pega esa URL en Thunder Client y envia el GET para ver el JSON final.
-6. Para refrescar, envia un POST a `http://localhost:8000/auth/google/refresh` con body JSON: `{"refresh_token":"..."}`.
-7. Para ver el usuario actual, envia un GET a `http://localhost:8000/auth/google/me` con header `Authorization: Bearer <access_token>`.
-
 
 ## Endpoints principales
 
@@ -337,3 +263,141 @@ docker compose -f docker-compose.prod.yml up --build -d
 - **Error "redirect_uri_mismatch"**: Asegúrate de que el Redirect URI en Google Cloud Console coincida exactamente con `GOOGLE_REDIRECT_URI` (incluyendo http/https y puerto).
 - **Error al validar id_token**: Verifica que la hora del sistema sea correcta (puede afectar validaciones de tokens).
 - **CORS error**: Revisa que `CORS_ORIGINS` incluya el origen desde el cual se hace la solicitud.
+
+# Google Calendar Service
+
+Este microservicio integra Google Calendar API para listar calendarios, leer eventos y crear/actualizar/eliminar eventos. Solo opera con tokens de Google obtenidos en `google_auth`.
+
+## Google Cloud Console (Calendar API)
+
+1. Ve a **APIs y servicios > Biblioteca**.
+2. Busca **Google Calendar API** y pulsa **HABILITAR**.
+3. En la pantalla de consentimiento, asegúrate de incluir el scope:
+   - `https://www.googleapis.com/auth/calendar`
+
+
+## Seguridad (JWT + Google Token)
+
+Cada request requiere al menos **uno** de estos:
+
+- `Authorization: Bearer <JWT>` (token interno)
+- `X-Google-Token: <access_token>` (token de Google)
+
+Para los endpoints de Google Calendar (`/google/*`) **se requiere** `X-Google-Token`.
+
+
+Header opcional:
+
+- `X-Google-Refresh: <refresh_token>` (si quieres refrescar)
+
+El JWT debe tener:
+
+- `sub` con el UUID del usuario
+- `exp` válido
+
+## Variables de entorno requeridas (Calendar Service)
+
+- `JWT_SECRET`
+- `JWT_ALGORITHM` (ej: `HS256`)
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_TOKEN_URI`
+- `GOOGLE_SCOPE` (debe incluir `https://www.googleapis.com/auth/calendar`)
+
+## Endpoints del Calendar Service
+
+- `GET /google/calendars`
+- `GET /google/events`
+- `POST /google/events`
+- `PUT /google/events/{id}`
+- `DELETE /google/events/{id}`
+- `POST /google/refresh`
+- `GET /health`
+- `GET /ready`
+
+## Ejemplos (Thunder Client / Postman)
+
+### Listar calendarios
+
+GET `http://localhost:8001/google/calendars`
+
+Headers:
+
+- `Authorization: Bearer <JWT>` (opcional)
+- `X-Google-Token: <access_token>` (obligatorio)
+
+### Listar eventos
+
+GET `http://localhost:8001/google/events?calendar_id=primary&time_min=2025-01-01T00:00:00Z&time_max=2025-12-31T23:59:59Z`
+
+Headers:
+
+- `Authorization: Bearer <JWT>` (opcional)
+- `X-Google-Token: <access_token>` (obligatorio)
+
+### Crear evento
+
+POST `http://localhost:8001/google/events`
+
+Headers:
+
+- `Authorization: Bearer <JWT>` (opcional)
+- `X-Google-Token: <access_token>` (obligatorio)
+
+Body:
+
+```json
+{
+  "calendar_id": "primary",
+  "summary": "Reunión de prueba",
+  "description": "Evento creado desde API",
+  "location": "Zoom",
+  "start": {"dateTime": "2026-05-10T15:00:00-06:00"},
+  "end": {"dateTime": "2026-05-10T16:00:00-06:00"},
+  "attendees": [{"email": "invitado@example.com"}],
+  "reminders": [{"method": "popup", "minutes": 30}]
+}
+```
+
+### Actualizar evento
+
+PUT `http://localhost:8001/google/events/{event_id}`
+
+Body (parcial):
+
+```json
+{
+  "calendar_id": "primary",
+  "summary": "Reunión actualizada"
+}
+```
+
+### Eliminar evento
+
+DELETE `http://localhost:8001/google/events/{event_id}?calendar_id=primary`
+
+### Refrescar access_token
+
+POST `http://localhost:8001/google/refresh`
+
+Body:
+
+```json
+{
+  "refresh_token": "<refresh_token>"
+}
+```
+
+## Ejecutar el Calendar Service
+
+Dev:
+
+```bash
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build calendar-service
+```
+
+Prod:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up --build -d calendar-service
+```

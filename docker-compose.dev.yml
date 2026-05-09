@@ -3,3 +3,14 @@ services:
     ports:
       - "${GOOGLE_AUTH_PORT:-8000}:8000"
     env_file: .env.dev
+
+  calendar-service:
+    build:
+      context: ./calendar_service
+    env_file: .env.dev
+    ports:
+      - "${CALENDAR_PORT:-8001}:8000"
+    volumes:
+      - ./calendar_service:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure

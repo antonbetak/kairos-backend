@@ -17,7 +17,15 @@ services:
   calendar-service:
     build: ./calendar_service
     env_file: ${ENV_FILE:-.env}
+    ports:
+      - "${CALENDAR_PORT:-8001}:8000"
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   googlefit_service:
     build: ./googlefit_service
