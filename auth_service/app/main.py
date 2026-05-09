@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi import Depends
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import status
+from jose import JWTError
 from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -15,7 +17,9 @@ from app.schemas import TokenResponse
 from app.schemas import UserCreate
 from app.schemas import UserLogin
 from app.schemas import UserResponse
+from app.schemas import VerifyTokenResponse
 from app.security import create_access_token
+from app.security import decode_access_token
 
 app = FastAPI(title="Kairos Auth Service")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -81,3 +85,24 @@ def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
     )
 
     return TokenResponse(access_token=access_token, expires_in=expires_in)
+
+
+@app.get("/auth/verify", response_model=VerifyTokenResponse)
+def verify_token(authorization: str | None = Header(default=None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="token invalido")
+
+    try:
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        if not user_id or not email:
+            raise HTTPException(status_code=401, detail="token invalido")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="token invalido")
+
+    return VerifyTokenResponse(valid=True, id_usuario=user_id, email=email)
