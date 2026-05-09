@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     auth_db_user: str
     auth_db_password: str
     auth_db_name: str
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
 
     @property
     def database_url(self) -> URL:

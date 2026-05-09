@@ -17,6 +17,16 @@ class UserCreate(BaseModel):
         return value.strip().lower()
 
 
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,3 +35,9 @@ class UserResponse(BaseModel):
     email: str
     created_at: datetime
     updated_at: datetime
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
