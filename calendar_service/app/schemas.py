@@ -145,3 +145,57 @@ class UpdateEventRequest(BaseModel):
 class DeleteResponse(BaseModel):
 	status: str
 	deleted: bool
+
+
+class DeviceCalendar(BaseModel):
+	id: str
+	title: str
+	source: str | None = None
+	color: str | None = None
+	is_primary: bool | None = None
+	allows_modifications: bool | None = None
+
+
+class DeviceCalendarsResponse(BaseModel):
+	items: list[DeviceCalendar] = []
+
+
+class DeviceCalendarsSyncRequest(BaseModel):
+	calendars: list[DeviceCalendar]
+
+
+class DeviceEvent(BaseModel):
+	id: str | None = None
+	calendar_id: str
+	title: str
+	start_date: str
+	end_date: str
+	notes: str | None = None
+	location: str | None = None
+	all_day: bool | None = None
+	time_zone: str | None = None
+	activity_id: str | None = None
+	source: str | None = None
+	metadata: dict[str, object] | None = None
+
+
+class DeviceEventsResponse(BaseModel):
+	items: list[DeviceEvent] = []
+
+
+class DeviceEventCreateRequest(BaseModel):
+	calendar_id: str
+	title: str
+	start_date: str
+	end_date: str
+	notes: str | None = None
+	location: str | None = None
+	all_day: bool | None = None
+	time_zone: str | None = None
+	activity_id: str | None = None
+	source: str | None = None
+	metadata: dict[str, object] | None = None
+
+
+class DeviceEventCreateResponse(BaseModel):
+	event: DeviceEvent

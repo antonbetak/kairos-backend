@@ -284,6 +284,7 @@ Cada request requiere al menos **uno** de estos:
 - `X-Google-Token: <access_token>` (token de Google)
 
 Para los endpoints de Google Calendar (`/google/*`) **se requiere** `X-Google-Token`.
+Si no tienes JWT interno, omite `Authorization` y envia solo `X-Google-Token`.
 
 
 Header opcional:
@@ -312,10 +313,13 @@ El JWT debe tener:
 - `PUT /google/events/{id}`
 - `DELETE /google/events/{id}`
 - `POST /google/refresh`
+- `GET /device/calendars`
+- `POST /device/calendars`
+- `GET /device/events`
+- `POST /device/events`
 - `GET /health`
 - `GET /ready`
 
-## Ejemplos (Thunder Client / Postman)
 
 ### Listar calendarios
 
@@ -386,6 +390,77 @@ Body:
 {
   "refresh_token": "<refresh_token>"
 }
+
+## Device Calendar 
+
+La lectura/creacion de eventos locales se hace en el dispositivo con Expo .
+El backend solo recibe la informacion para sincronizar y mantener aislamiento por usuario.
+
+### Instalacion en app Expo
+
+```bash
+npx expo install expo-calendar
+```
+
+
+
+
+### Probar endpoints de dispositivo
+
+1) Sincroniza calendarios locales:
+
+POST `http://localhost:8001/device/calendars`
+
+Headers:
+
+- `Authorization: Bearer <JWT>`
+
+Body:
+
+```json
+{
+  "calendars": [
+    {"id": "local-1", "title": "Personal", "source": "device"}
+  ]
+}
+```
+
+2) Leer calendarios sincronizados:
+
+GET `http://localhost:8001/device/calendars`
+
+Headers:
+
+- `Authorization: Bearer <JWT>`
+
+3) Crear evento local (client-side) y notificar al backend:
+
+POST `http://localhost:8001/device/events`
+
+Headers:
+
+- `Authorization: Bearer <JWT>`
+
+Body:
+
+```json
+{
+  "calendar_id": "local-1",
+  "title": "Evento local",
+  "start_date": "2026-05-10T15:00:00-06:00",
+  "end_date": "2026-05-10T16:00:00-06:00",
+  "notes": "Creado desde Expo Calendar",
+  "location": "Dispositivo"
+}
+```
+
+4) Leer eventos sincronizados:
+
+GET `http://localhost:8001/device/events?calendar_id=local-1`
+
+Headers:
+
+- `Authorization: Bearer <JWT>`
 ```
 
 ## Ejecutar el Calendar Service

@@ -4,7 +4,7 @@ import logging
 from functools import wraps
 
 import jwt
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -76,6 +76,16 @@ def require_auth(
     access_token = str(google_token).strip() if google_token else None
 
     return AuthContext(user_id=user_id, access_token=access_token, refresh_token=google_refresh)
+
+
+def require_jwt(auth: AuthContext = Depends(require_auth)) -> AuthContext:
+    if not auth.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="JWT requerido para acceder a endpoints de dispositivo.",
+        )
+
+    return auth
 
 
 def require_google_login(func):

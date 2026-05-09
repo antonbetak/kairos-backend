@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.routes.device_calendar import router as device_calendar_router
 from app.routes.google_calendar import router as google_calendar_router
 from app.routes.health import router as health_router
 
@@ -42,6 +43,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(google_calendar_router)
+app.include_router(device_calendar_router)
 
 
 @app.get("/", include_in_schema=False)
