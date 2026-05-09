@@ -1,0 +1,45 @@
+services:
+  google_auth:
+    build: ./google_auth
+    env_file: .env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_NAME: ${APP_NAME:-google_auth_service}
+      APP_PORT: ${APP_PORT:-8000}
+    restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  calendar-service:
+    build: ./calendar_service
+    env_file: ${ENV_FILE:-.env}
+    restart: on-failure
+
+  googlefit_service:
+    build: ./googlefit_service
+    env_file: ${ENV_FILE:-.env}
+    restart: on-failure
+
+  stt_service:
+    build: ./stt_service
+    env_file: ${ENV_FILE:-.env}
+    restart: on-failure
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+volumes:
+  redis_data:

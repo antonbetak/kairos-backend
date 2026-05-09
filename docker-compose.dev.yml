@@ -1,0 +1,5 @@
+services:
+  google_auth:
+    ports:
+      - "${GOOGLE_AUTH_PORT:-8000}:8000"
+    env_file: .env.dev
