@@ -1,3 +1,9 @@
+# Endpoints por microservicio (resumen)
+
+- `google_auth` (8000): `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`, `/health`, `/`.
+- `calendar_service` (8001): `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST), `/health`, `/ready`, `/`.
+- `googlefit_service` (8002): `/fit/me`, `/health`, `/ready`, `/`.
+
 # Google Auth Service
 
 El microservicio `google_auth`, responsable únicamente del proceso de autenticación con Google (OAuth2 / OpenID Connect). No extrae ni persiste datos de Google Fit, Calendar u otros servicios.
@@ -475,4 +481,128 @@ Prod:
 
 ```bash
 docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up --build -d calendar-service
+```
+
+# Google Fit Service
+
+Microservicio independiente para consultar datos de Google Fit en una sola respuesta.
+
+## Google Cloud Console (Fitness API)
+
+1. Ve a **APIs y servicios > Biblioteca**.
+2. Busca **Fitness API** y pulsa **HABILITAR**.
+3. En la pantalla de consentimiento, agrega estos scopes (lectura y escritura):
+  - `https://www.googleapis.com/auth/fitness.sleep.write`
+  - `https://www.googleapis.com/auth/fitness.sleep.read`
+  - `https://www.googleapis.com/auth/fitness.oxygen_saturation.write`
+  - `https://www.googleapis.com/auth/fitness.oxygen_saturation.read`
+  - `https://www.googleapis.com/auth/fitness.nutrition.write`
+  - `https://www.googleapis.com/auth/fitness.nutrition.read`
+  - `https://www.googleapis.com/auth/fitness.location.write`
+  - `https://www.googleapis.com/auth/fitness.location.read`
+  - `https://www.googleapis.com/auth/fitness.heart_rate.write`
+  - `https://www.googleapis.com/auth/fitness.heart_rate.read`
+  - `https://www.googleapis.com/auth/fitness.body.write`
+  - `https://www.googleapis.com/auth/fitness.body.read`
+  - `https://www.googleapis.com/auth/fitness.body_temperature.write`
+  - `https://www.googleapis.com/auth/fitness.body_temperature.read`
+  - `https://www.googleapis.com/auth/fitness.blood_pressure.write`
+  - `https://www.googleapis.com/auth/fitness.blood_pressure.read`
+  - `https://www.googleapis.com/auth/fitness.blood_glucose.write`
+  - `https://www.googleapis.com/auth/fitness.blood_glucose.read`
+  - `https://www.googleapis.com/auth/fitness.activity.write`
+  - `https://www.googleapis.com/auth/fitness.activity.read`
+
+**Nota**: El `google_auth` debe solicitar estos scopes en `GOOGLE_SCOPE` para que el token tenga permisos de Fit.
+
+## Seguridad
+
+El endpoint `/fit/me` requiere un **access_token de Google**.
+
+Headers:
+
+- `X-Google-Token: <access_token>`
+- `X-Google-Refresh: <refresh_token>` (opcional)
+
+## Variables de entorno (Google Fit)
+
+- `GOOGLE_FIT_PORT`
+- `GOOGLE_FIT_API_BASE`
+- `GOOGLE_FIT_SCOPES` (usar scopes de lectura y escritura)
+- `FIT_BUCKET_DAYS`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_TOKEN_URI`
+
+## Endpoint unico
+
+- `GET /fit/me`
+
+Parametros opcionales:
+
+- `start` (ISO datetime)
+- `end` (ISO datetime)
+- `bucket_days` (default 1)
+
+Ejemplo:
+
+GET `http://localhost:8002/fit/me?start=2026-05-01T00:00:00Z&end=2026-05-31T23:59:59Z`
+
+Headers:
+
+- `X-Google-Token: <access_token>`
+
+Respuesta (resumen):
+
+```json
+{
+  "user_id": "1234567890",
+  "scopes": [
+    "https://www.googleapis.com/auth/fitness.sleep.write",
+    "https://www.googleapis.com/auth/fitness.sleep.read",
+    "https://www.googleapis.com/auth/fitness.oxygen_saturation.write",
+    "https://www.googleapis.com/auth/fitness.oxygen_saturation.read",
+    "https://www.googleapis.com/auth/fitness.nutrition.write",
+    "https://www.googleapis.com/auth/fitness.nutrition.read",
+    "https://www.googleapis.com/auth/fitness.location.write",
+    "https://www.googleapis.com/auth/fitness.location.read",
+    "https://www.googleapis.com/auth/fitness.heart_rate.write",
+    "https://www.googleapis.com/auth/fitness.heart_rate.read",
+    "https://www.googleapis.com/auth/fitness.body.write",
+    "https://www.googleapis.com/auth/fitness.body.read",
+    "https://www.googleapis.com/auth/fitness.body_temperature.write",
+    "https://www.googleapis.com/auth/fitness.body_temperature.read",
+    "https://www.googleapis.com/auth/fitness.blood_pressure.write",
+    "https://www.googleapis.com/auth/fitness.blood_pressure.read",
+    "https://www.googleapis.com/auth/fitness.blood_glucose.write",
+    "https://www.googleapis.com/auth/fitness.blood_glucose.read",
+    "https://www.googleapis.com/auth/fitness.activity.write",
+    "https://www.googleapis.com/auth/fitness.activity.read"
+  ],
+  "time_range": {
+    "start_time": "2026-05-01T00:00:00+00:00",
+    "end_time": "2026-05-31T23:59:59+00:00",
+    "startTimeMillis": 1777593600000,
+    "endTimeMillis": 1780271999000
+  },
+  "metrics": [
+    {"name": "steps", "dataTypeName": "com.google.step_count.delta", "total": 12345}
+  ],
+  "sessions": [],
+  "data_sources": []
+}
+```
+
+## Ejecutar el Google Fit Service
+
+Dev:
+
+```bash
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build googlefit_service
+```
+
+Prod:
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up --build -d googlefit_service
 ```

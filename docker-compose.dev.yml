@@ -14,3 +14,14 @@ services:
       - ./calendar_service:/app
     command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: on-failure
+
+  googlefit_service:
+    build:
+      context: ./googlefit_service
+    env_file: .env.dev
+    ports:
+      - "${GOOGLE_FIT_PORT:-8002}:8000"
+    volumes:
+      - ./googlefit_service:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure
