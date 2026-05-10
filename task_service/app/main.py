@@ -98,3 +98,25 @@ def actualizar_tarea(
     db.refresh(tarea)
 
     return tarea
+
+
+@app.delete("/tasks/{id_tarea}")
+def eliminar_tarea(
+    id_tarea: UUID,
+    id_usuario: str = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    tarea = (
+        db.query(models.Tarea)
+        .filter(models.Tarea.id_tarea == id_tarea)
+        .filter(models.Tarea.id_usuario == id_usuario)
+        .first()
+    )
+
+    if not tarea:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
+
+    db.delete(tarea)
+    db.commit()
+
+    return {"message": "Tarea eliminada"}
