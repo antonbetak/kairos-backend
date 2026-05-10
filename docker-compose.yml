@@ -63,6 +63,16 @@ services:
       timeout: 5s
       retries: 5
 
+  schedule_service:
+    build:
+      context: ./schedule_service
+    container_name: kairos-schedule-service
+    restart: unless-stopped
+    expose:
+      - "8000"
+    networks:
+      - kairos-network
+
 volumes:
   postgres_data:
   redis_data:
