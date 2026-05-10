@@ -30,6 +30,18 @@ def health():
     return {"service": "task_service", "status": "ok"}
 
 
+@app.get("/tasks", response_model=list[TareaRespuesta])
+def listar_tareas(db: Session = Depends(get_db)):
+    tareas = (
+        db.query(models.Tarea)
+        .filter(models.Tarea.id_usuario == "usuario-demo")
+        .order_by(models.Tarea.created_at.desc())
+        .all()
+    )
+
+    return tareas
+
+
 @app.post("/tasks", response_model=TareaRespuesta)
 def crear_tarea(tarea: TareaCrear, db: Session = Depends(get_db)):
     nueva_tarea = models.Tarea(
