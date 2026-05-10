@@ -10,6 +10,10 @@ class TareaCrear(BaseModel):
     descripcion: str | None = None
 
 
+class TareaActualizar(BaseModel):
+    completada: bool
+
+
 class TareaRespuesta(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
