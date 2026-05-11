@@ -74,14 +74,13 @@ services:
       SCHEDULE_DB_HOST: ${SCHEDULE_DB_HOST}
       SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT}
       SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME}
-    expose:
-      - "8000"
+    ports:
+      - "8004:8000"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - kairos-network
-
 volumes:
   postgres_data:
   redis_data:
