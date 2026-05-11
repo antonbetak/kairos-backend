@@ -1,8 +1,17 @@
-# Endpoints por microservicio (resumen)
+# API Gateway
 
-- `google_auth` (8000): `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`, `/health`, `/`.
-- `calendar_service` (8001): `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST), `/health`, `/ready`, `/`.
-- `googlefit_service` (8002): `/fit/me`, `/health`, `/ready`, `/`.
+El **API Gateway** es el unico punto de entrada expuesto. Todos los microservicios quedan en red interna.
+
+- Base URL: `http://localhost:8000`
+- Health del gateway: `GET /health`
+- Ready del gateway: `GET /ready`
+
+# Endpoints por microservicio (via gateway)
+
+- `google_auth`: `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`.
+- `calendar_service`: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST).
+- `googlefit_service`: `/fit/me`.
+- Healths via gateway: `/health/google_auth`, `/health/calendar`, `/health/fit`.
 
 # Google Auth Service
 
@@ -329,7 +338,7 @@ El JWT debe tener:
 
 ### Listar calendarios
 
-GET `http://localhost:8001/google/calendars`
+GET `http://localhost:8000/google/calendars`
 
 Headers:
 
@@ -338,7 +347,7 @@ Headers:
 
 ### Listar eventos
 
-GET `http://localhost:8001/google/events?calendar_id=primary&time_min=2025-01-01T00:00:00Z&time_max=2025-12-31T23:59:59Z`
+GET `http://localhost:8000/google/events?calendar_id=primary&time_min=2025-01-01T00:00:00Z&time_max=2025-12-31T23:59:59Z`
 
 Headers:
 
@@ -347,7 +356,7 @@ Headers:
 
 ### Crear evento
 
-POST `http://localhost:8001/google/events`
+POST `http://localhost:8000/google/events`
 
 Headers:
 
@@ -371,7 +380,7 @@ Body:
 
 ### Actualizar evento
 
-PUT `http://localhost:8001/google/events/{event_id}`
+PUT `http://localhost:8000/google/events/{event_id}`
 
 Body (parcial):
 
@@ -384,11 +393,11 @@ Body (parcial):
 
 ### Eliminar evento
 
-DELETE `http://localhost:8001/google/events/{event_id}?calendar_id=primary`
+DELETE `http://localhost:8000/google/events/{event_id}?calendar_id=primary`
 
 ### Refrescar access_token
 
-POST `http://localhost:8001/google/refresh`
+POST `http://localhost:8000/google/refresh`
 
 Body:
 
@@ -415,7 +424,7 @@ npx expo install expo-calendar
 
 1) Sincroniza calendarios locales:
 
-POST `http://localhost:8001/device/calendars`
+POST `http://localhost:8000/device/calendars`
 
 Headers:
 
@@ -433,7 +442,7 @@ Body:
 
 2) Leer calendarios sincronizados:
 
-GET `http://localhost:8001/device/calendars`
+GET `http://localhost:8000/device/calendars`
 
 Headers:
 
@@ -441,7 +450,7 @@ Headers:
 
 3) Crear evento local (client-side) y notificar al backend:
 
-POST `http://localhost:8001/device/events`
+POST `http://localhost:8000/device/events`
 
 Headers:
 
@@ -462,7 +471,7 @@ Body:
 
 4) Leer eventos sincronizados:
 
-GET `http://localhost:8001/device/events?calendar_id=local-1`
+GET `http://localhost:8000/device/events?calendar_id=local-1`
 
 Headers:
 
@@ -546,7 +555,7 @@ Parametros opcionales:
 
 Ejemplo:
 
-GET `http://localhost:8002/fit/me?start=2026-05-01T00:00:00Z&end=2026-05-31T23:59:59Z`
+GET `http://localhost:8000/fit/me?start=2026-05-01T00:00:00Z&end=2026-05-31T23:59:59Z`
 
 Headers:
 
