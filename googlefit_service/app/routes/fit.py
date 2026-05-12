@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import get_settings
 from app.schemas import FitMeResponse, FitTimeRange
-from app.security import FitAuthContext, require_google_token
+from app.security import FitAuthContext, require_google_login, require_google_token
 from app.services.google_fit import GoogleFitService
 
 
@@ -34,6 +34,7 @@ def _to_ms(value: datetime) -> int:
 
 
 @router.get("/me", response_model=FitMeResponse, summary="Get Google Fit summary")
+@require_google_login
 async def fit_me(
     start: str | None = Query(None, description="ISO datetime"),
     end: str | None = Query(None, description="ISO datetime"),

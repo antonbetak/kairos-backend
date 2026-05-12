@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from functools import wraps
 
 import httpx
 from fastapi import Header, HTTPException, status
@@ -124,3 +125,24 @@ async def require_google_token(
         expires_in=expires_in_value,
         refreshed=refreshed,
     )
+
+
+def require_google_login(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        auth = kwargs.get("auth")
+        if auth is None:
+            for arg in args:
+                if isinstance(arg, FitAuthContext):
+                    auth = arg
+                    break
+
+        if not auth or not auth.access_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Debe iniciar sesion con Google (X-Google-Token).",
+            )
+
+        return await func(*args, **kwargs)
+
+    return wrapper
