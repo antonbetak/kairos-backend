@@ -1,11 +1,17 @@
 import httpx
 
+from app.config import get_settings
+
+
+settings = get_settings()
+
 
 async def verify_token(token: str):
+    url = f"{settings.auth_service_url.rstrip('/')}/auth/verify"
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                "http://auth_service:8000/auth/verify",
+                url,
                 headers={"Authorization": f"Bearer {token}"},
             )
     except httpx.RequestError:

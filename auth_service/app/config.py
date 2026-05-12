@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
+    jwt_refresh_expire_minutes: int = 10080
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str | None = None
 
     @property
     def database_url(self) -> URL:

@@ -143,13 +143,19 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
-    ports:
-      - "8001:8000"
+      JWT_REFRESH_EXPIRE_MINUTES: ${JWT_REFRESH_EXPIRE_MINUTES}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - kairos-network
+    expose:
+      - "8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
       interval: 10s
@@ -167,13 +173,13 @@ services:
       SCHEDULE_DB_HOST: ${SCHEDULE_DB_HOST}
       SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT}
       SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME}
-    ports:
-      - "8004:8000"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - kairos-network
+    expose:
+      - "8000"
 
   task_service:
     build:
@@ -191,6 +197,39 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - kairos-network
+
+  notifications_service:
+    build:
+      context: ./notifications_service
+    container_name: kairos-notifications-service
+    restart: on-failure
+    env_file: ${ENV_FILE:-.env}
+    expose:
+      - "8000"
+    networks:
+      - kairos-network
+
+  stats_service:
+    build:
+      context: ./stats_service
+    container_name: kairos-stats-service
+    restart: on-failure
+    env_file: ${ENV_FILE:-.env}
+    expose:
+      - "8000"
+    networks:
+      - kairos-network
+
+  agent_service:
+    build:
+      context: ./agent_service
+    container_name: kairos-agent-service
+    restart: on-failure
+    env_file: ${ENV_FILE:-.env}
+    expose:
+      - "8000"
     networks:
       - kairos-network
 

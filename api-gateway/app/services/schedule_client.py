@@ -1,7 +1,10 @@
 import httpx
 
+from app.config import get_settings
 
-SCHEDULE_SERVICE_URL = "http://schedule_service:8000"
+
+settings = get_settings()
+SCHEDULE_SERVICE_URL = settings.schedule_service_url.rstrip("/")
 
 
 async def crear_horario(id_usuario: str, datos: dict):

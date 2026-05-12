@@ -9,9 +9,100 @@ El **API Gateway** es el unico punto de entrada expuesto. Todos los microservici
 # Endpoints por microservicio (via gateway)
 
 - `google_auth`: `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`.
+- `auth_service`: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`, `/auth/verify`.
 - `calendar_service`: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST).
 - `googlefit_service`: `/fit/me`.
-- Healths via gateway: `/health/google_auth`, `/health/calendar`, `/health/fit`.
+- `task_service`: `/tasks` (GET/POST).
+- `schedule_service`: `/schedule` (GET/POST), `/schedule/{id}` (GET/PATCH/DELETE).
+- `stt_service`: `/stt/*` (ej. `/stt/health`).
+- `notifications_service`: `/notifications/*` (ej. `/notifications/health`).
+- `stats_service`: `/stats/*` (ej. `/stats/health`).
+- `agent_service`: `/agent/*` (ej. `/agent/health`).
+- Healths via gateway: `/health/google_auth`, `/health/calendar`, `/health/fit`, `/health/auth_service`, `/health/schedule_service`, `/health/task_service`, `/health/stt_service`, `/health/notifications_service`, `/health/stats_service`, `/health/agent_service`.
+
+Nota: `/tasks` y `/schedule/*` requieren `Authorization: Bearer <token>` emitido por `auth_service`.
+Nota: `auth_service` y `google_auth` son servicios distintos; sus rutas no colisionan.
+
+# Auditoria de ramas del API Gateway
+
+## Mapa de conflictos
+
+| Aspecto | Rama A (feature/api_gateway) | Rama B (feature/integracion-auth-task-schedule-gateway) | Decision propuesta |
+| --- | --- | --- | --- |
+| Rutas duplicadas | `/health`, `/ready`, `/health/{service}`, `/ready/{service}`, `/auth/google/*`, `/google/*`, `/device/*`, `/fit/*` | `/health`, `/tasks`, `/schedule`, `/schedule/{id}` | Mantener ambas familias de rutas; `/health`
+| Middlewares | CORS configurable via `CORS_ORIGINS` | Sin CORS | Conservar CORS aplicar dependencia de auth solo en rutas protegidas |
+| Puertos | Gateway expone `API_GATEWAY_PORT` y usa URLs por env | URLs hardcodeadas a `auth_service`, `schedule_service`, `task_service`; no config de puerto en gateway | Centralizar URLs y puertos en `config.py` |
+| Naming conventions | `google_auth`, `calendar-service`, `googlefit_service` | `auth_service`, `schedule_service`, `task_service` | Estandarizar nombres internos en config (snake_case) y permitir override por env. |
+| Manejo de errores | Proxy con `HTTP 502` si falla upstream; reenvia status/headers | `response.json()` sin validar status; auth devuelve `401` en dependencia | Mantener comportamiento por ruta para compatibilidad; documentar que tasks/schedule responden JSON directo. |
+| Autenticacion | No valida tokens | Dependencia `obtener_usuario_actual` con `Authorization: Bearer` | Conservar auth en `/tasks` y `/schedule/*`; no exigir auth en rutas de Google. |
+| Formato de respuesta | Passthrough completo (status, headers, body) | JSON directo (sin status upstream) | Mantener passthrough para rutas proxy; mantener JSON directo para tasks/schedule. |
+
+## Inventario de servicios
+
+- `google_auth` -> `/auth/google/*` -> `http://google_auth:8000`
+- `calendar_service` -> `/google/*`, `/device/*` -> `http://calendar-service:8000`
+- `googlefit_service` -> `/fit/*` -> `http://googlefit_service:8000`
+- `auth_service` -> `/auth/*` -> `http://auth_service:8000`
+- `task_service` -> `/tasks` -> `http://task_service:8000`
+- `schedule_service` -> `/schedule`, `/schedule/{id}` -> `http://schedule_service:8000`
+- `stt_service` -> `/stt/*` -> `http://stt_service:8000`
+- `notifications_service` -> `/notifications/*` -> `http://notifications_service:8000`
+- `stats_service` -> `/stats/*` -> `http://stats_service:8000`
+- `agent_service` -> `/agent/*` -> `http://agent_service:8000`
+
+# Como correr el proyecto
+
+1. Copia variables de entorno base:
+
+```bash
+copy .env.example .env
+```
+
+2. Ajusta secretos y credenciales en `.env`.
+3. Levanta los servicios con Docker:
+
+```bash
+docker compose up --build
+```
+
+4. Verifica el gateway:
+
+```bash
+curl http://localhost:8000/health
+```
+
+Solo el API Gateway expone puertos al host; el resto de servicios quedan en red interna.
+
+Nota: `docker-compose.dev.yml` y `docker-compose.prod.yml` cubren el stack de Google (auth/calendar/fit). Para el stack completo usa `docker-compose.yml`.
+
+## Networks en Docker Compose
+
+No es estrictamente necesario definir `networks` cuando usas un solo archivo Compose, porque Docker crea una red por defecto. Aun asi, se recomienda declararla explicitamente por estas razones:
+
+- Hace explicita la red interna (`kairos-network`) para todos los servicios.
+- Permite controlar el driver (bridge) y mantener la misma red si luego divides el stack en varios archivos Compose.
+- Evita cambios de nombre automaticos de red si cambias el nombre del proyecto.
+
+Como funciona:
+
+- Todos los servicios que comparten `kairos-network` pueden resolverse por nombre de servicio (por ejemplo `auth_service`, `schedule_service`).
+- El trafico entre servicios se mantiene dentro de la red interna, mientras que solo los puertos publicados con `ports` quedan expuestos al host.
+
+# Pruebas basicas por servicio
+
+| Servicio | Comando | Observaciones |
+| --- | --- | --- |
+| API Gateway | `curl http://localhost:8000/health` | Punto de entrada unico. |
+| Google Auth | `curl http://localhost:8000/health/google_auth` | Health via gateway. |
+| Calendar | `curl http://localhost:8000/health/calendar` | Health via gateway. |
+| Google Fit | `curl http://localhost:8000/health/fit` | Health via gateway. |
+| Auth Service | `curl http://localhost:8000/health/auth_service` | Health via gateway. |
+| Schedule Service | `curl http://localhost:8000/health/schedule_service` | Health via gateway. |
+| Task Service | `curl http://localhost:8000/health/task_service` | Health via gateway. |
+| STT Service | `curl http://localhost:8000/health/stt_service` | Health via gateway. |
+| Notifications Service | `curl http://localhost:8000/health/notifications_service` | Health via gateway. |
+| Stats Service | `curl http://localhost:8000/health/stats_service` | Health via gateway. |
+| Agent Service | `curl http://localhost:8000/health/agent_service` | Health via gateway. |
 
 # Google Auth Service
 

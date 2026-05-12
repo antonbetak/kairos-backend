@@ -52,6 +52,34 @@ class Settings(BaseSettings):
 		default="http://googlefit_service:8000",
 		validation_alias=AliasChoices("GOOGLE_FIT_URL", "google_fit_url"),
 	)
+	stt_service_url: str = Field(
+		default="http://stt_service:8000",
+		validation_alias=AliasChoices("STT_SERVICE_URL", "stt_service_url"),
+	)
+	notifications_service_url: str = Field(
+		default="http://notifications_service:8000",
+		validation_alias=AliasChoices("NOTIFICATIONS_SERVICE_URL", "notifications_service_url"),
+	)
+	stats_service_url: str = Field(
+		default="http://stats_service:8000",
+		validation_alias=AliasChoices("STATS_SERVICE_URL", "stats_service_url"),
+	)
+	agent_service_url: str = Field(
+		default="http://agent_service:8000",
+		validation_alias=AliasChoices("AGENT_SERVICE_URL", "agent_service_url"),
+	)
+	auth_service_url: str = Field(
+		default="http://auth_service:8000",
+		validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
+	)
+	schedule_service_url: str = Field(
+		default="http://schedule_service:8000",
+		validation_alias=AliasChoices("SCHEDULE_SERVICE_URL", "schedule_service_url"),
+	)
+	task_service_url: str = Field(
+		default="http://task_service:8000",
+		validation_alias=AliasChoices("TASK_SERVICE_URL", "task_service_url"),
+	)
 
 	request_timeout_seconds: float = Field(
 		default=20.0,
