@@ -89,6 +89,24 @@ services:
       timeout: 5s
       retries: 5
 
+  schedule_service:
+    build:
+      context: ./schedule_service
+    container_name: kairos-schedule-service
+    restart: unless-stopped
+    environment:
+      SCHEDULE_DB_USER: ${SCHEDULE_DB_USER}
+      SCHEDULE_DB_PASSWORD: ${SCHEDULE_DB_PASSWORD}
+      SCHEDULE_DB_HOST: ${SCHEDULE_DB_HOST}
+      SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT}
+      SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME}
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kairos-network
 volumes:
   postgres_data:
   redis_data:
