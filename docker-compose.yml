@@ -12,6 +12,14 @@ services:
         condition: service_healthy
       googlefit_service:
         condition: service_healthy
+      auth_service:
+        condition: service_healthy
+      schedule_service:
+        condition: service_started
+      task_service:
+        condition: service_started
+    networks:
+      - kairos-network
 
   google_auth:
     build: ./google_auth
@@ -29,6 +37,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - kairos-network
 
   calendar-service:
     build: ./calendar_service
@@ -42,6 +52,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - kairos-network
 
   googlefit_service:
     build: ./googlefit_service
@@ -55,6 +67,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - kairos-network
 
   stt_service:
     build: ./stt_service
@@ -63,15 +77,128 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks:
+      - kairos-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: kairos-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
+    container_name: kairos-redis
+    ports:
+      - "${REDIS_PORT}:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - kairos-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
+      timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: kairos-rabbitmq
+    ports:
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth_service:
+    build:
+      context: ./auth_service
+    container_name: kairos-auth-service
+    environment:
+      AUTH_DB_HOST: postgres
+      AUTH_DB_PORT: 5432
+      AUTH_DB_USER: ${AUTH_DB_USER}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      AUTH_DB_NAME: ${AUTH_DB_NAME}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+    ports:
+      - "8001:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  schedule_service:
+    build:
+      context: ./schedule_service
+    container_name: kairos-schedule-service
+    restart: unless-stopped
+    environment:
+      SCHEDULE_DB_USER: ${SCHEDULE_DB_USER}
+      SCHEDULE_DB_PASSWORD: ${SCHEDULE_DB_PASSWORD}
+      SCHEDULE_DB_HOST: ${SCHEDULE_DB_HOST}
+      SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT}
+      SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME}
+    ports:
+      - "8004:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kairos-network
+
+  task_service:
+    build:
+      context: ./task_service
+    container_name: kairos-task-service
+    restart: unless-stopped
+    environment:
+      TASK_DB_USER: ${TASK_DB_USER}
+      TASK_DB_PASSWORD: ${TASK_DB_PASSWORD}
+      TASK_DB_HOST: ${TASK_DB_HOST}
+      TASK_DB_PORT: ${TASK_DB_PORT}
+      TASK_DB_NAME: ${TASK_DB_NAME}
+    expose:
+      - "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kairos-network
+
 volumes:
+  postgres_data:
   redis_data:
+  rabbitmq_data:
+
+networks:
+  kairos-network:
+    driver: bridge
