@@ -63,10 +63,38 @@ services:
       timeout: 5s
       retries: 5
 
+  notifications_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-notifications-postgres
+    environment:
+      POSTGRES_USER: ${NOTIFICATIONS_DB_USER:-kairos_notifications_user}
+      POSTGRES_PASSWORD: ${NOTIFICATIONS_DB_PASSWORD:-kairos_notifications_password}
+      POSTGRES_DB: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+    ports:
+      - "${NOTIFICATIONS_DB_LOCAL_PORT:-5437}:5432"
+    volumes:
+      - notifications_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${NOTIFICATIONS_DB_USER:-kairos_notifications_user} -d ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   notifications_service:
     build:
       context: ./notifications_service
     container_name: kairos-notifications-service
+    environment:
+      NOTIFICATIONS_DB_USER: ${NOTIFICATIONS_DB_USER:-kairos_notifications_user}
+      NOTIFICATIONS_DB_PASSWORD: ${NOTIFICATIONS_DB_PASSWORD:-kairos_notifications_password}
+      NOTIFICATIONS_DB_HOST: notifications_postgres
+      NOTIFICATIONS_DB_PORT: ${NOTIFICATIONS_DB_PORT:-5432}
+      NOTIFICATIONS_DB_NAME: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+    depends_on:
+      notifications_postgres:
+        condition: service_healthy
     ports:
       - "${NOTIFICATIONS_SERVICE_PORT:-8006}:8000"
     networks:
@@ -79,6 +107,7 @@ services:
 
 volumes:
   postgres_data:
+  notifications_postgres_data:
   redis_data:
   rabbitmq_data:
 
