@@ -99,6 +99,13 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     estadistica.tareas_completadas += 1
     estadistica.fecha_actualizacion = datetime.utcnow()
 
+    if estadistica.tareas_creadas > 0:
+        estadistica.porcentaje_cumplimiento = (
+            estadistica.tareas_completadas / estadistica.tareas_creadas * 100
+        )
+    else:
+        estadistica.porcentaje_cumplimiento = 0
+
     if estadistica.tareas_completadas >= 1:
         desbloquear_logro_si_no_existe(
             db,
@@ -126,5 +133,22 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     db.commit()
     db.refresh(estadistica)
     db.refresh(racha)
+
+    return estadistica
+
+
+def registrar_tarea_creada(db: Session, id_usuario: UUID):
+    estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
+
+    estadistica.tareas_creadas += 1
+    estadistica.fecha_actualizacion = datetime.utcnow()
+
+    if estadistica.tareas_creadas > 0:
+        estadistica.porcentaje_cumplimiento = (
+            estadistica.tareas_completadas / estadistica.tareas_creadas * 100
+        )
+
+    db.commit()
+    db.refresh(estadistica)
 
     return estadistica
