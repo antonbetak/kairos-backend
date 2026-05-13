@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models import EstadisticaUsuario
+from app.models import RachaUsuario
 
 
 def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):
@@ -22,3 +23,28 @@ def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):
     db.refresh(estadistica)
 
     return estadistica
+
+
+def obtener_o_crear_racha_usuario(db: Session, id_usuario: UUID, tipo: str):
+    racha = (
+        db.query(RachaUsuario)
+        .filter(RachaUsuario.id_usuario == id_usuario)
+        .filter(RachaUsuario.tipo == tipo)
+        .first()
+    )
+
+    if racha:
+        return racha
+
+    racha = RachaUsuario(
+        id_usuario=id_usuario,
+        tipo=tipo,
+        racha_actual=0,
+        mejor_racha=0,
+    )
+
+    db.add(racha)
+    db.commit()
+    db.refresh(racha)
+
+    return racha

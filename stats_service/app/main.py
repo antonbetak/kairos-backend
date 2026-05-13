@@ -11,7 +11,9 @@ from app.db import Base
 from app.db import SessionLocal
 from app.db import engine
 from app.schemas import EstadisticaRespuesta
+from app.schemas import RachaRespuesta
 from app.services import obtener_o_crear_estadistica_usuario
+from app.services import obtener_o_crear_racha_usuario
 
 app = FastAPI(title="Kairos Stats Service")
 
@@ -50,3 +52,12 @@ def obtener_estadisticas(
     db: Session = Depends(get_db),
 ):
     return obtener_o_crear_estadistica_usuario(db, id_usuario)
+
+
+@app.get("/rachas/{tipo}", response_model=RachaRespuesta)
+def obtener_racha(
+    tipo: str,
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    return obtener_o_crear_racha_usuario(db, id_usuario, tipo)
