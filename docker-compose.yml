@@ -63,6 +63,20 @@ services:
       timeout: 5s
       retries: 5
 
+  notifications_service:
+    build:
+      context: ./notifications_service
+    container_name: kairos-notifications-service
+    ports:
+      - "${NOTIFICATIONS_SERVICE_PORT:-8006}:8000"
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:
