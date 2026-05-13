@@ -7,6 +7,9 @@ from app.services.schedule_client import crear_horario
 from app.services.schedule_client import eliminar_horario
 from app.services.schedule_client import listar_horarios
 from app.services.schedule_client import obtener_horario
+from app.services.stats_client import listar_logros
+from app.services.stats_client import obtener_estadisticas
+from app.services.stats_client import obtener_racha
 from app.services.task_client import crear_tarea
 from app.services.task_client import listar_tareas
 
@@ -62,3 +65,21 @@ async def actualizar_horario_por_id(
 async def eliminar_horario_por_id(schedule_id: str, usuario=Depends(obtener_usuario_actual)):
     id_usuario = usuario["id_usuario"]
     return await eliminar_horario(id_usuario, schedule_id)
+
+
+@app.get("/estadisticas")
+async def consultar_estadisticas(usuario=Depends(obtener_usuario_actual)):
+    id_usuario = usuario["id_usuario"]
+    return await obtener_estadisticas(id_usuario)
+
+
+@app.get("/rachas/{tipo}")
+async def consultar_racha(tipo: str, usuario=Depends(obtener_usuario_actual)):
+    id_usuario = usuario["id_usuario"]
+    return await obtener_racha(id_usuario, tipo)
+
+
+@app.get("/logros")
+async def consultar_logros(usuario=Depends(obtener_usuario_actual)):
+    id_usuario = usuario["id_usuario"]
+    return await listar_logros(id_usuario)
