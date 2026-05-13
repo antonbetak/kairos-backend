@@ -84,17 +84,17 @@ services:
     image: postgres:16-alpine
     container_name: kairos-auth-postgres
     environment:
-      POSTGRES_USER: ${AUTH_DB_USER}
-      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD}
-      POSTGRES_DB: ${AUTH_DB_NAME}
+      POSTGRES_USER: ${AUTH_DB_USER:-kairos_auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-kairos_auth_password}
+      POSTGRES_DB: ${AUTH_DB_NAME:-kairos_auth_db}
     ports:
-      - "${AUTH_DB_LOCAL_PORT}:5432"
+      - "${AUTH_DB_LOCAL_PORT:-5433}:5432"
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
     networks:
       - kairos-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER} -d ${AUTH_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER:-kairos_auth_user} -d ${AUTH_DB_NAME:-kairos_auth_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -103,17 +103,17 @@ services:
     image: postgres:16-alpine
     container_name: kairos-task-postgres
     environment:
-      POSTGRES_USER: ${TASK_DB_USER}
-      POSTGRES_PASSWORD: ${TASK_DB_PASSWORD}
-      POSTGRES_DB: ${TASK_DB_NAME}
+      POSTGRES_USER: ${TASK_DB_USER:-kairos_task_user}
+      POSTGRES_PASSWORD: ${TASK_DB_PASSWORD:-kairos_task_password}
+      POSTGRES_DB: ${TASK_DB_NAME:-kairos_task_db}
     ports:
-      - "${TASK_DB_LOCAL_PORT}:5432"
+      - "${TASK_DB_LOCAL_PORT:-5434}:5432"
     volumes:
       - task_postgres_data:/var/lib/postgresql/data
     networks:
       - kairos-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TASK_DB_USER} -d ${TASK_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${TASK_DB_USER:-kairos_task_user} -d ${TASK_DB_NAME:-kairos_task_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -122,17 +122,17 @@ services:
     image: postgres:16-alpine
     container_name: kairos-schedule-postgres
     environment:
-      POSTGRES_USER: ${SCHEDULE_DB_USER}
-      POSTGRES_PASSWORD: ${SCHEDULE_DB_PASSWORD}
-      POSTGRES_DB: ${SCHEDULE_DB_NAME}
+      POSTGRES_USER: ${SCHEDULE_DB_USER:-kairos_schedule_user}
+      POSTGRES_PASSWORD: ${SCHEDULE_DB_PASSWORD:-kairos_schedule_password}
+      POSTGRES_DB: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
     ports:
-      - "${SCHEDULE_DB_LOCAL_PORT}:5432"
+      - "${SCHEDULE_DB_LOCAL_PORT:-5435}:5432"
     volumes:
       - schedule_postgres_data:/var/lib/postgresql/data
     networks:
       - kairos-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SCHEDULE_DB_USER} -d ${SCHEDULE_DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${SCHEDULE_DB_USER:-kairos_schedule_user} -d ${SCHEDULE_DB_NAME:-kairos_schedule_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -175,13 +175,13 @@ services:
     environment:
       AUTH_DB_HOST: auth_postgres
       AUTH_DB_PORT: 5432
-      AUTH_DB_USER: ${AUTH_DB_USER}
-      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
-      AUTH_DB_NAME: ${AUTH_DB_NAME}
+      AUTH_DB_USER: ${AUTH_DB_USER:-kairos_auth_user}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-kairos_auth_password}
+      AUTH_DB_NAME: ${AUTH_DB_NAME:-kairos_auth_db}
       JWT_SECRET: ${JWT_SECRET}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
-      JWT_REFRESH_EXPIRE_MINUTES: ${JWT_REFRESH_EXPIRE_MINUTES}
+      JWT_REFRESH_EXPIRE_MINUTES: ${JWT_REFRESH_EXPIRE_MINUTES:-10080}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: ${REDIS_DB:-0}
@@ -206,11 +206,11 @@ services:
     container_name: kairos-schedule-service
     restart: unless-stopped
     environment:
-      SCHEDULE_DB_USER: ${SCHEDULE_DB_USER}
-      SCHEDULE_DB_PASSWORD: ${SCHEDULE_DB_PASSWORD}
+      SCHEDULE_DB_USER: ${SCHEDULE_DB_USER:-kairos_schedule_user}
+      SCHEDULE_DB_PASSWORD: ${SCHEDULE_DB_PASSWORD:-kairos_schedule_password}
       SCHEDULE_DB_HOST: schedule_postgres
-      SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT}
-      SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME}
+      SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT:-5432}
+      SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
     depends_on:
       schedule_postgres:
         condition: service_healthy
@@ -225,11 +225,11 @@ services:
     container_name: kairos-task-service
     restart: unless-stopped
     environment:
-      TASK_DB_USER: ${TASK_DB_USER}
-      TASK_DB_PASSWORD: ${TASK_DB_PASSWORD}
+      TASK_DB_USER: ${TASK_DB_USER:-kairos_task_user}
+      TASK_DB_PASSWORD: ${TASK_DB_PASSWORD:-kairos_task_password}
       TASK_DB_HOST: task_postgres
-      TASK_DB_PORT: ${TASK_DB_PORT}
-      TASK_DB_NAME: ${TASK_DB_NAME}
+      TASK_DB_PORT: ${TASK_DB_PORT:-5432}
+      TASK_DB_NAME: ${TASK_DB_NAME:-kairos_task_db}
     expose:
       - "8000"
     depends_on:
