@@ -1,0 +1,19 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    stats_db_user: str
+    stats_db_password: str
+    stats_db_host: str
+    stats_db_port: int
+    stats_db_name: str
+
+    @property
+    def database_url(self) -> str:
+        return (
+            f"postgresql+psycopg2://{self.stats_db_user}:{self.stats_db_password}"
+            f"@{self.stats_db_host}:{self.stats_db_port}/{self.stats_db_name}"
+        )
+
+
+settings = Settings()

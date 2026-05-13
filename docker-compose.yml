@@ -168,6 +168,26 @@ services:
       timeout: 5s
       retries: 5
 
+  stats_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-stats-postgres
+    environment:
+      POSTGRES_USER: ${STATS_DB_USER:-kairos_stats_user}
+      POSTGRES_PASSWORD: ${STATS_DB_PASSWORD:-kairos_stats_password}
+      POSTGRES_DB: ${STATS_DB_NAME:-kairos_stats_db}
+    ports:
+      - "${STATS_DB_LOCAL_PORT:-5436}:5432"
+    volumes:
+      - stats_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STATS_DB_USER:-kairos_stats_user} -d ${STATS_DB_NAME:-kairos_stats_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  google_auth_service:
   auth_service:
     build:
       context: ./auth_service
@@ -194,6 +214,29 @@ services:
       - kairos-network
     expose:
       - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  stats_service:
+    build:
+      context: ./stats_service
+    container_name: kairos-stats-service
+    environment:
+      STATS_DB_USER: ${STATS_DB_USER:-kairos_stats_user}
+      STATS_DB_PASSWORD: ${STATS_DB_PASSWORD:-kairos_stats_password}
+      STATS_DB_HOST: stats_postgres
+      STATS_DB_PORT: ${STATS_DB_PORT:-5432}
+      STATS_DB_NAME: ${STATS_DB_NAME:-kairos_stats_db}
+    depends_on:
+      stats_postgres:
+        condition: service_healthy
+    ports:
+      - "${STATS_SERVICE_PORT:-8005}:8000"
+    networks:
+      - kairos-network
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
       interval: 10s
@@ -272,6 +315,8 @@ services:
       - kairos-network
 
 volumes:
+  postgres_data:
+  stats_postgres_data:
   auth_postgres_data:
   task_postgres_data:
   schedule_postgres_data:
