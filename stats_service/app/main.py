@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app import models
 from app.db import Base
 from app.db import engine
 
