@@ -11,9 +11,11 @@ from app.db import Base
 from app.db import SessionLocal
 from app.db import engine
 from app.schemas import EstadisticaRespuesta
+from app.schemas import LogroRespuesta
 from app.schemas import RachaRespuesta
 from app.services import obtener_o_crear_estadistica_usuario
 from app.services import obtener_o_crear_racha_usuario
+from app.services import listar_logros_usuario
 
 app = FastAPI(title="Kairos Stats Service")
 
@@ -61,3 +63,11 @@ def obtener_racha(
     db: Session = Depends(get_db),
 ):
     return obtener_o_crear_racha_usuario(db, id_usuario, tipo)
+
+
+@app.get("/logros", response_model=list[LogroRespuesta])
+def listar_logros(
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    return listar_logros_usuario(db, id_usuario)
