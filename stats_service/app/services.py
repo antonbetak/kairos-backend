@@ -62,12 +62,51 @@ def listar_logros_usuario(db: Session, id_usuario: UUID):
     )
 
 
+def desbloquear_logro_si_no_existe(
+    db: Session,
+    id_usuario: UUID,
+    codigo: str,
+    titulo: str,
+    descripcion: str,
+):
+    logro = (
+        db.query(LogroUsuario)
+        .filter(LogroUsuario.id_usuario == id_usuario)
+        .filter(LogroUsuario.codigo == codigo)
+        .first()
+    )
+
+    if logro:
+        return logro
+
+    logro = LogroUsuario(
+        id_usuario=id_usuario,
+        codigo=codigo,
+        titulo=titulo,
+        descripcion=descripcion,
+    )
+
+    db.add(logro)
+    db.flush()
+
+    return logro
+
+
 def registrar_tarea_completada(db: Session, id_usuario: UUID):
     estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
     racha = obtener_o_crear_racha_usuario(db, id_usuario, "tareas")
 
     estadistica.tareas_completadas += 1
     estadistica.fecha_actualizacion = datetime.utcnow()
+
+    if estadistica.tareas_completadas >= 1:
+        desbloquear_logro_si_no_existe(
+            db,
+            id_usuario,
+            "primera_tarea",
+            "Primer avance",
+            "Completaste tu primera tarea en Kairos",
+        )
 
     racha.racha_actual += 1
     if racha.racha_actual > racha.mejor_racha:
