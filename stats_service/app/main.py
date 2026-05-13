@@ -16,6 +16,8 @@ from app.schemas import RachaRespuesta
 from app.services import obtener_o_crear_estadistica_usuario
 from app.services import obtener_o_crear_racha_usuario
 from app.services import listar_logros_usuario
+from app.services import registrar_bloque_completado
+from app.services import registrar_horario_creado
 from app.services import registrar_tarea_completada
 from app.services import registrar_tarea_creada
 
@@ -89,3 +91,19 @@ def registrar_evento_tarea_creada(
     db: Session = Depends(get_db),
 ):
     return registrar_tarea_creada(db, id_usuario)
+
+
+@app.post("/eventos/horario-creado", response_model=EstadisticaRespuesta)
+def registrar_evento_horario_creado(
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    return registrar_horario_creado(db, id_usuario)
+
+
+@app.post("/eventos/bloque-completado", response_model=EstadisticaRespuesta)
+def registrar_evento_bloque_completado(
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    return registrar_bloque_completado(db, id_usuario)

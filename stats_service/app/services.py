@@ -152,3 +152,27 @@ def registrar_tarea_creada(db: Session, id_usuario: UUID):
     db.refresh(estadistica)
 
     return estadistica
+
+
+def registrar_horario_creado(db: Session, id_usuario: UUID):
+    estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
+
+    estadistica.horarios_creados += 1
+    estadistica.fecha_actualizacion = datetime.utcnow()
+
+    db.commit()
+    db.refresh(estadistica)
+
+    return estadistica
+
+
+def registrar_bloque_completado(db: Session, id_usuario: UUID):
+    estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
+
+    estadistica.bloques_completados += 1
+    estadistica.fecha_actualizacion = datetime.utcnow()
+
+    db.commit()
+    db.refresh(estadistica)
+
+    return estadistica
