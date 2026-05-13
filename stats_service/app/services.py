@@ -112,6 +112,15 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     if racha.racha_actual > racha.mejor_racha:
         racha.mejor_racha = racha.racha_actual
 
+    if racha.racha_actual >= 3:
+        desbloquear_logro_si_no_existe(
+            db,
+            id_usuario,
+            "racha_3_tareas",
+            "Constancia inicial",
+            "Completaste tareas 3 veces consecutivas",
+        )
+
     racha.ultima_fecha_actividad = date.today()
 
     db.commit()
