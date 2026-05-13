@@ -16,6 +16,7 @@ from app.schemas import RachaRespuesta
 from app.services import obtener_o_crear_estadistica_usuario
 from app.services import obtener_o_crear_racha_usuario
 from app.services import listar_logros_usuario
+from app.services import registrar_tarea_completada
 
 app = FastAPI(title="Kairos Stats Service")
 
@@ -71,3 +72,11 @@ def listar_logros(
     db: Session = Depends(get_db),
 ):
     return listar_logros_usuario(db, id_usuario)
+
+
+@app.post("/eventos/tarea-completada", response_model=EstadisticaRespuesta)
+def registrar_evento_tarea_completada(
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    return registrar_tarea_completada(db, id_usuario)

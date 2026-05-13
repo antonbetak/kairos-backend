@@ -1,3 +1,5 @@
+from datetime import date
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -58,3 +60,23 @@ def listar_logros_usuario(db: Session, id_usuario: UUID):
         .order_by(LogroUsuario.fecha_desbloqueo.desc())
         .all()
     )
+
+
+def registrar_tarea_completada(db: Session, id_usuario: UUID):
+    estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
+    racha = obtener_o_crear_racha_usuario(db, id_usuario, "tareas")
+
+    estadistica.tareas_completadas += 1
+    estadistica.fecha_actualizacion = datetime.utcnow()
+
+    racha.racha_actual += 1
+    if racha.racha_actual > racha.mejor_racha:
+        racha.mejor_racha = racha.racha_actual
+
+    racha.ultima_fecha_actividad = date.today()
+
+    db.commit()
+    db.refresh(estadistica)
+    db.refresh(racha)
+
+    return estadistica
