@@ -12,6 +12,7 @@ from app.database import engine
 from app.schemas import TareaActualizar
 from app.schemas import TareaCrear
 from app.schemas import TareaRespuesta
+from app.services.stats_client import notificar_tarea_completada
 
 app = FastAPI(title="Kairos Task Service")
 
@@ -93,9 +94,13 @@ def actualizar_tarea(
     if not tarea:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
 
+    estaba_completada = tarea.completada
     tarea.completada = datos.completada
     db.commit()
     db.refresh(tarea)
+
+    if not estaba_completada and tarea.completada:
+        notificar_tarea_completada(id_usuario)
 
     return tarea
 
