@@ -17,6 +17,7 @@ from app.schemas import NotificacionInterna
 from app.schemas import NotificacionRespuesta
 from app.services.notificaciones import crear_notificacion
 from app.services.notificaciones import marcar_notificacion_leida
+from app.services.notificaciones import marcar_todas_como_leidas
 from app.services.notificaciones import obtener_notificaciones_usuario
 from app.services.rabbitmq_consumer import iniciar_consumidor
 
@@ -96,3 +97,11 @@ def leer_notificacion(
         raise HTTPException(status_code=403, detail="No puedes modificar esta notificación")
 
     return marcar_notificacion_leida(db, notificacion)
+
+
+@app.patch("/notificaciones/leer-todas", response_model=list[NotificacionRespuesta])
+def leer_todas_notificaciones(
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    return marcar_todas_como_leidas(db, id_usuario)

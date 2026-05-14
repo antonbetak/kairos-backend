@@ -38,3 +38,21 @@ def marcar_notificacion_leida(db: Session, notificacion: NotificacionUsuario):
     db.refresh(notificacion)
 
     return notificacion
+
+
+def marcar_todas_como_leidas(db: Session, id_usuario: UUID):
+    notificaciones = (
+        db.query(NotificacionUsuario)
+        .filter(NotificacionUsuario.id_usuario == id_usuario)
+        .filter(NotificacionUsuario.leida == False)
+        .all()
+    )
+
+    fecha_lectura = datetime.utcnow()
+    for notificacion in notificaciones:
+        notificacion.leida = True
+        notificacion.fecha_lectura = fecha_lectura
+
+    db.commit()
+
+    return obtener_notificaciones_usuario(db, id_usuario)
