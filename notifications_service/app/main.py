@@ -12,6 +12,7 @@ from app.db import SessionLocal
 from app.db import engine
 from app.models import NotificacionUsuario
 from app.schemas import NotificacionCrear
+from app.schemas import NotificacionInterna
 from app.schemas import NotificacionRespuesta
 from app.services import crear_notificacion
 from app.services import marcar_notificacion_leida
@@ -63,6 +64,14 @@ def crear_nueva_notificacion(
     db: Session = Depends(get_db),
 ):
     return crear_notificacion(db, id_usuario, datos)
+
+
+@app.post("/notificaciones/interna", response_model=NotificacionRespuesta)
+def crear_notificacion_interna(
+    datos: NotificacionInterna,
+    db: Session = Depends(get_db),
+):
+    return crear_notificacion(db, datos.id_usuario, datos)
 
 
 @app.patch("/notificaciones/{notificacion_id}/leer", response_model=NotificacionRespuesta)

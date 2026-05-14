@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models import EstadisticaUsuario
 from app.models import LogroUsuario
 from app.models import RachaUsuario
+from app.services.notifications_client import crear_notificacion_usuario
 
 
 def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):
@@ -89,6 +90,13 @@ def desbloquear_logro_si_no_existe(
     db.add(logro)
     db.flush()
 
+    crear_notificacion_usuario(
+        id_usuario,
+        f"Desbloqueaste el logro: {titulo}",
+        descripcion,
+        "logro",
+    )
+
     return logro
 
 
@@ -119,6 +127,14 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     if racha.racha_actual > racha.mejor_racha:
         racha.mejor_racha = racha.racha_actual
 
+    if racha.racha_actual == 3:
+        crear_notificacion_usuario(
+            id_usuario,
+            "Racha activa",
+            f"Llevas una racha de {racha.racha_actual} días",
+            "racha",
+        )
+
     if racha.racha_actual >= 3:
         desbloquear_logro_si_no_existe(
             db,
@@ -126,6 +142,14 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
             "racha_3_tareas",
             "Constancia inicial",
             "Completaste tareas 3 veces consecutivas",
+        )
+
+    if estadistica.tareas_creadas > 0 and estadistica.porcentaje_cumplimiento >= 100:
+        crear_notificacion_usuario(
+            id_usuario,
+            "Cumplimiento completo",
+            f"Completaste el {round(estadistica.porcentaje_cumplimiento)}% de tus tareas",
+            "cumplimiento",
         )
 
     racha.ultima_fecha_actividad = date.today()
