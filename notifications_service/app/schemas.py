@@ -5,6 +5,12 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 
 
+class NotificacionCrear(BaseModel):
+    titulo: str
+    mensaje: str
+    tipo: str
+
+
 class NotificacionRespuesta(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
