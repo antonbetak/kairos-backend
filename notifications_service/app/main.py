@@ -1,4 +1,5 @@
 from uuid import UUID
+from threading import Thread
 
 from fastapi import Depends
 from fastapi import FastAPI
@@ -14,9 +15,10 @@ from app.models import NotificacionUsuario
 from app.schemas import NotificacionCrear
 from app.schemas import NotificacionInterna
 from app.schemas import NotificacionRespuesta
-from app.services import crear_notificacion
-from app.services import marcar_notificacion_leida
-from app.services import obtener_notificaciones_usuario
+from app.services.notificaciones import crear_notificacion
+from app.services.notificaciones import marcar_notificacion_leida
+from app.services.notificaciones import obtener_notificaciones_usuario
+from app.services.rabbitmq_consumer import iniciar_consumidor
 
 app = FastAPI(title="Kairos Notifications Service")
 
@@ -42,6 +44,7 @@ def obtener_id_usuario(x_user_id: str | None = Header(default=None)):
 @app.on_event("startup")
 def iniciar_base_de_datos():
     Base.metadata.create_all(bind=engine)
+    Thread(target=iniciar_consumidor, daemon=True).start()
 
 
 @app.get("/health")
