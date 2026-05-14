@@ -69,6 +69,8 @@ def desbloquear_logro_si_no_existe(
     codigo: str,
     titulo: str,
     descripcion: str,
+    titulo_notificacion: str | None = None,
+    tipo_notificacion: str = "logro",
 ):
     logro = (
         db.query(LogroUsuario)
@@ -92,9 +94,9 @@ def desbloquear_logro_si_no_existe(
 
     crear_notificacion_usuario(
         id_usuario,
-        f"Desbloqueaste el logro: {titulo}",
+        titulo_notificacion or f"Desbloqueaste el logro: {titulo}",
         descripcion,
-        "logro",
+        tipo_notificacion,
     )
 
     return logro
@@ -195,6 +197,28 @@ def registrar_bloque_completado(db: Session, id_usuario: UUID):
 
     estadistica.bloques_completados += 1
     estadistica.fecha_actualizacion = datetime.utcnow()
+
+    if estadistica.bloques_completados == 1:
+        desbloquear_logro_si_no_existe(
+            db,
+            id_usuario,
+            "primer_bloque",
+            "Primer bloque completado",
+            "Completaste tu primer bloque de concentración",
+            "Primer bloque completado",
+            "logro",
+        )
+
+    if estadistica.bloques_completados == 3:
+        desbloquear_logro_si_no_existe(
+            db,
+            id_usuario,
+            "tres_bloques",
+            "Buen ritmo",
+            "Ya completaste 3 bloques programados",
+            "Buen ritmo",
+            "racha",
+        )
 
     db.commit()
     db.refresh(estadistica)

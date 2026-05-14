@@ -13,13 +13,13 @@ from app.db import engine
 from app.schemas import EstadisticaRespuesta
 from app.schemas import LogroRespuesta
 from app.schemas import RachaRespuesta
-from app.services import obtener_o_crear_estadistica_usuario
-from app.services import obtener_o_crear_racha_usuario
-from app.services import listar_logros_usuario
-from app.services import registrar_bloque_completado
-from app.services import registrar_horario_creado
-from app.services import registrar_tarea_completada
-from app.services import registrar_tarea_creada
+from app.services.estadisticas import obtener_o_crear_estadistica_usuario
+from app.services.estadisticas import obtener_o_crear_racha_usuario
+from app.services.estadisticas import listar_logros_usuario
+from app.services.estadisticas import registrar_bloque_completado
+from app.services.estadisticas import registrar_horario_creado
+from app.services.estadisticas import registrar_tarea_completada
+from app.services.estadisticas import registrar_tarea_creada
 
 app = FastAPI(title="Kairos Stats Service")
 
