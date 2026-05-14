@@ -3,20 +3,18 @@ services:
     build: ./api-gateway
     env_file: ${ENV_FILE:-.env}
     ports:
-      - "${API_GATEWAY_PORT:-8000}:8000"
+      - "8000:8000"
     restart: on-failure
     depends_on:
-      google_auth:
-        condition: service_healthy
-      calendar-service:
-        condition: service_healthy
-      googlefit_service:
-        condition: service_healthy
       auth_service:
         condition: service_healthy
       schedule_service:
         condition: service_started
       task_service:
+        condition: service_started
+      stats_service:
+        condition: service_started
+      notifications_service:
         condition: service_started
     networks:
       - kairos-network
@@ -29,8 +27,8 @@ services:
       APP_NAME: ${APP_NAME:-google_auth_service}
       APP_PORT: ${APP_PORT:-8000}
     restart: on-failure
-    expose:
-      - "8000"
+    ports:
+      - "8007:8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
       interval: 10s
@@ -44,8 +42,8 @@ services:
     build: ./calendar_service
     env_file: ${ENV_FILE:-.env}
     restart: on-failure
-    expose:
-      - "8000"
+    ports:
+      - "8008:8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
       interval: 10s
@@ -59,8 +57,8 @@ services:
     build: ./googlefit_service
     env_file: ${ENV_FILE:-.env}
     restart: on-failure
-    expose:
-      - "8000"
+    ports:
+      - "8009:8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
       interval: 10s
@@ -74,11 +72,18 @@ services:
     build: ./stt_service
     env_file: ${ENV_FILE:-.env}
     restart: on-failure
+    ports:
+      - "8010:8000"
     depends_on:
       redis:
         condition: service_healthy
     networks:
       - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   postgres:
     image: postgres:16-alpine
@@ -107,7 +112,7 @@ services:
       POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-kairos_auth_password}
       POSTGRES_DB: ${AUTH_DB_NAME:-kairos_auth_db}
     ports:
-      - "${AUTH_DB_LOCAL_PORT:-5433}:5432"
+      - "5433:5432"
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
     networks:
@@ -126,7 +131,7 @@ services:
       POSTGRES_PASSWORD: ${TASK_DB_PASSWORD:-kairos_task_password}
       POSTGRES_DB: ${TASK_DB_NAME:-kairos_task_db}
     ports:
-      - "${TASK_DB_LOCAL_PORT:-5434}:5432"
+      - "5434:5432"
     volumes:
       - task_postgres_data:/var/lib/postgresql/data
     networks:
@@ -145,7 +150,7 @@ services:
       POSTGRES_PASSWORD: ${SCHEDULE_DB_PASSWORD:-kairos_schedule_password}
       POSTGRES_DB: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
     ports:
-      - "${SCHEDULE_DB_LOCAL_PORT:-5435}:5432"
+      - "5435:5432"
     volumes:
       - schedule_postgres_data:/var/lib/postgresql/data
     networks:
@@ -195,7 +200,7 @@ services:
       POSTGRES_PASSWORD: ${STATS_DB_PASSWORD:-kairos_stats_password}
       POSTGRES_DB: ${STATS_DB_NAME:-kairos_stats_db}
     ports:
-      - "${STATS_DB_LOCAL_PORT:-5436}:5432"
+      - "5436:5432"
     volumes:
       - stats_postgres_data:/var/lib/postgresql/data
     networks:
@@ -230,8 +235,8 @@ services:
         condition: service_healthy
     networks:
       - kairos-network
-    expose:
-      - "8000"
+    ports:
+      - "8001:8000"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
       interval: 10s
@@ -252,7 +257,7 @@ services:
       stats_postgres:
         condition: service_healthy
     ports:
-      - "${STATS_SERVICE_PORT:-8005}:8000"
+      - "8005:8000"
     networks:
       - kairos-network
     healthcheck:
@@ -269,7 +274,7 @@ services:
       POSTGRES_PASSWORD: ${NOTIFICATIONS_DB_PASSWORD:-kairos_notifications_password}
       POSTGRES_DB: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
     ports:
-      - "${NOTIFICATIONS_DB_LOCAL_PORT:-5437}:5432"
+      - "5437:5432"
     volumes:
       - notifications_postgres_data:/var/lib/postgresql/data
     networks:
@@ -296,8 +301,13 @@ services:
         condition: service_healthy
     networks:
       - kairos-network
-    expose:
-      - "8000"
+    ports:
+      - "8004:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   task_service:
     build:
@@ -310,13 +320,18 @@ services:
       TASK_DB_HOST: task_postgres
       TASK_DB_PORT: ${TASK_DB_PORT:-5432}
       TASK_DB_NAME: ${TASK_DB_NAME:-kairos_task_db}
-    expose:
-      - "8000"
+    ports:
+      - "8002:8000"
     depends_on:
       task_postgres:
         condition: service_healthy
     networks:
       - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   notifications_service:
     build:
@@ -333,7 +348,7 @@ services:
       notifications_postgres:
         condition: service_healthy
     ports:
-      - "${NOTIFICATIONS_SERVICE_PORT:-8006}:8000"
+      - "8006:8000"
     networks:
       - kairos-network
     healthcheck:
@@ -348,10 +363,15 @@ services:
     container_name: kairos-agent-service
     restart: on-failure
     env_file: ${ENV_FILE:-.env}
-    expose:
-      - "8000"
+    ports:
+      - "8011:8000"
     networks:
       - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
