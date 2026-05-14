@@ -353,8 +353,11 @@ services:
       NOTIFICATIONS_DB_HOST: notifications_postgres
       NOTIFICATIONS_DB_PORT: ${NOTIFICATIONS_DB_PORT:-5432}
       NOTIFICATIONS_DB_NAME: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       notifications_postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "8006:8000"

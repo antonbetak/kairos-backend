@@ -10,6 +10,7 @@ from app.routes.proxy import router as proxy_router
 from app.services.notifications_client import crear_notificacion
 from app.services.notifications_client import listar_notificaciones
 from app.services.notifications_client import marcar_notificacion_leida
+from app.services.notifications_client import marcar_todas_notificaciones_leidas
 from app.services.schedule_client import actualizar_horario
 from app.services.schedule_client import crear_horario
 from app.services.schedule_client import eliminar_horario
@@ -19,6 +20,8 @@ from app.services.stats_client import listar_logros
 from app.services.stats_client import obtener_estadisticas
 from app.services.stats_client import obtener_racha
 from app.services.task_client import crear_tarea
+from app.services.task_client import actualizar_tarea
+from app.services.task_client import eliminar_tarea
 from app.services.task_client import listar_tareas
 
 
@@ -76,6 +79,22 @@ async def obtener_tareas(usuario=Depends(obtener_usuario_actual)):
 async def crear_nueva_tarea(datos: dict, usuario=Depends(obtener_usuario_actual)):
 	id_usuario = usuario["id_usuario"]
 	return await crear_tarea(id_usuario, datos)
+
+
+@app.patch("/tasks/{id_tarea}")
+async def actualizar_tarea_por_id(
+	id_tarea: str,
+	datos: dict,
+	usuario=Depends(obtener_usuario_actual),
+):
+	id_usuario = usuario["id_usuario"]
+	return await actualizar_tarea(id_usuario, id_tarea, datos)
+
+
+@app.delete("/tasks/{id_tarea}")
+async def eliminar_tarea_por_id(id_tarea: str, usuario=Depends(obtener_usuario_actual)):
+	id_usuario = usuario["id_usuario"]
+	return await eliminar_tarea(id_usuario, id_tarea)
 
 
 @app.post("/schedule")
@@ -146,3 +165,9 @@ async def crear_nueva_notificacion(datos: dict, usuario=Depends(obtener_usuario_
 async def leer_notificacion(notificacion_id: str, usuario=Depends(obtener_usuario_actual)):
 	id_usuario = usuario["id_usuario"]
 	return await marcar_notificacion_leida(id_usuario, notificacion_id)
+
+
+@app.patch("/notificaciones/leer-todas")
+async def leer_todas_notificaciones(usuario=Depends(obtener_usuario_actual)):
+	id_usuario = usuario["id_usuario"]
+	return await marcar_todas_notificaciones_leidas(id_usuario)
