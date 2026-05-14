@@ -12,6 +12,7 @@ from app.database import engine
 from app.schemas import TareaActualizar
 from app.schemas import TareaCrear
 from app.schemas import TareaRespuesta
+from app.services.rabbitmq_publisher import publicar_tarea_completada
 from app.services.stats_client import notificar_tarea_completada
 
 app = FastAPI(title="Kairos Task Service")
@@ -101,6 +102,11 @@ def actualizar_tarea(
 
     if not estaba_completada and tarea.completada:
         notificar_tarea_completada(id_usuario)
+        publicar_tarea_completada(
+            id_usuario,
+            str(tarea.id_tarea),
+            tarea.titulo,
+        )
 
     return tarea
 

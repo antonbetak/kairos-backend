@@ -320,10 +320,13 @@ services:
       TASK_DB_HOST: task_postgres
       TASK_DB_PORT: ${TASK_DB_PORT:-5432}
       TASK_DB_NAME: ${TASK_DB_NAME:-kairos_task_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     ports:
       - "8002:8000"
     depends_on:
       task_postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - kairos-network

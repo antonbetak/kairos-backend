@@ -1,5 +1,6 @@
 fastapi
 httpx
+pika
 psycopg2-binary
 pydantic-settings
 sqlalchemy
