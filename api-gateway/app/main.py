@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from fastapi import Depends
 
 from app.dependencies.auth import obtener_usuario_actual
+from app.services.notifications_client import crear_notificacion
+from app.services.notifications_client import listar_notificaciones
+from app.services.notifications_client import marcar_notificacion_leida
 from app.services.schedule_client import actualizar_horario
 from app.services.schedule_client import crear_horario
 from app.services.schedule_client import eliminar_horario
@@ -83,3 +86,21 @@ async def consultar_racha(tipo: str, usuario=Depends(obtener_usuario_actual)):
 async def consultar_logros(usuario=Depends(obtener_usuario_actual)):
     id_usuario = usuario["id_usuario"]
     return await listar_logros(id_usuario)
+
+
+@app.get("/notificaciones")
+async def obtener_notificaciones(usuario=Depends(obtener_usuario_actual)):
+    id_usuario = usuario["id_usuario"]
+    return await listar_notificaciones(id_usuario)
+
+
+@app.post("/notificaciones")
+async def crear_nueva_notificacion(datos: dict, usuario=Depends(obtener_usuario_actual)):
+    id_usuario = usuario["id_usuario"]
+    return await crear_notificacion(id_usuario, datos)
+
+
+@app.patch("/notificaciones/{notificacion_id}/leer")
+async def leer_notificacion(notificacion_id: str, usuario=Depends(obtener_usuario_actual)):
+    id_usuario = usuario["id_usuario"]
+    return await marcar_notificacion_leida(id_usuario, notificacion_id)
