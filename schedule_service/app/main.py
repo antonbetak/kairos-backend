@@ -14,6 +14,7 @@ from app.database import engine
 from app.schemas import ScheduleCreate
 from app.schemas import ScheduleResponse
 from app.schemas import ScheduleUpdate
+from app.services.stats_client import notificar_bloque_completado
 
 app = FastAPI(title="Kairos Schedule Service")
 
@@ -126,12 +127,17 @@ def actualizar_bloque(
     if fecha_fin <= fecha_inicio:
         raise HTTPException(status_code=400, detail="fecha_fin debe ser mayor que fecha_inicio")
 
+    status_anterior = bloque.status
+
     for campo, valor in datos.model_dump(exclude_unset=True).items():
         setattr(bloque, campo, valor)
 
     bloque.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(bloque)
+
+    if status_anterior != "completed" and bloque.status == "completed":
+        notificar_bloque_completado(str(id_usuario))
 
     return bloque
 
