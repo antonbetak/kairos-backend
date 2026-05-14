@@ -10,13 +10,15 @@ import pika
 from app.db import SessionLocal
 from app.models import EventoProcesado
 from app.models import EstadisticaUsuario
+from app.services.estadisticas import registrar_bloque_completado
 from app.services.estadisticas import registrar_tarea_completada
 
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE = "kairos.events"
-QUEUE = "stats.tareas"
-ROUTING_KEY = "tarea.completada"
+QUEUE = "stats.eventos"
+TAREA_COMPLETADA = "tarea.completada"
+BLOQUE_COMPLETADO = "bloque.completado"
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ def fecha_evento(mensaje: dict):
     return fecha
 
 
-def ya_llego_por_http(db, id_usuario: UUID, mensaje: dict):
+def ya_llego_por_http(db, id_usuario: UUID, mensaje: dict, campo: str):
     fecha = fecha_evento(mensaje)
     if not fecha:
         return False
@@ -64,10 +66,10 @@ def ya_llego_por_http(db, id_usuario: UUID, mensaje: dict):
         return False
 
     segundos = abs((fecha - estadistica.fecha_actualizacion).total_seconds())
-    return estadistica.tareas_completadas > 0 and segundos <= 10
+    return getattr(estadistica, campo) > 0 and segundos <= 10
 
 
-def procesar_tarea_completada(mensaje: dict):
+def datos_basicos_evento(mensaje: dict):
     event_id = mensaje.get("event_id")
     event_type = mensaje.get("event_type")
     id_usuario = mensaje.get("id_usuario")
@@ -75,24 +77,57 @@ def procesar_tarea_completada(mensaje: dict):
     if not event_id or not id_usuario:
         raise ValueError("Evento incompleto")
 
+    return event_id, event_type, UUID(str(id_usuario))
+
+
+def procesar_tarea_completada(db, mensaje: dict):
+    event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
+
+    if evento_ya_procesado(db, event_id):
+        print("Evento tarea.completada ya procesado")
+        return
+
+    if ya_llego_por_http(db, id_usuario, mensaje, "tareas_completadas"):
+        guardar_evento_procesado(db, event_id, event_type or TAREA_COMPLETADA)
+        db.commit()
+        print("Evento tarea.completada ya aplicado por HTTP")
+        return
+
+    registrar_tarea_completada(db, id_usuario)
+    guardar_evento_procesado(db, event_id, event_type or TAREA_COMPLETADA)
+    db.commit()
+    print("Evento tarea.completada recibido en stats")
+
+
+def procesar_bloque_completado(db, mensaje: dict):
+    event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
+
+    if evento_ya_procesado(db, event_id):
+        print("Evento bloque.completado ya procesado")
+        return
+
+    if ya_llego_por_http(db, id_usuario, mensaje, "bloques_completados"):
+        guardar_evento_procesado(db, event_id, event_type or BLOQUE_COMPLETADO)
+        db.commit()
+        print("Evento bloque.completado ya aplicado por HTTP")
+        return
+
+    registrar_bloque_completado(db, id_usuario)
+    guardar_evento_procesado(db, event_id, event_type or BLOQUE_COMPLETADO)
+    db.commit()
+    print("Evento bloque.completado recibido en stats")
+
+
+def procesar_evento(mensaje: dict):
+    event_type = mensaje.get("event_type")
     db = SessionLocal()
     try:
-        if evento_ya_procesado(db, event_id):
-            print("Evento tarea.completada ya procesado")
-            return
-
-        id_usuario_uuid = UUID(str(id_usuario))
-
-        if ya_llego_por_http(db, id_usuario_uuid, mensaje):
-            guardar_evento_procesado(db, event_id, event_type or ROUTING_KEY)
-            db.commit()
-            print("Evento tarea.completada ya aplicado por HTTP")
-            return
-
-        registrar_tarea_completada(db, id_usuario_uuid)
-        guardar_evento_procesado(db, event_id, event_type or ROUTING_KEY)
-        db.commit()
-        print("Evento tarea.completada recibido en stats")
+        if event_type == TAREA_COMPLETADA:
+            procesar_tarea_completada(db, mensaje)
+        elif event_type == BLOQUE_COMPLETADO:
+            procesar_bloque_completado(db, mensaje)
+        else:
+            raise ValueError("Tipo de evento no soportado")
     except Exception:
         db.rollback()
         raise
@@ -103,15 +138,15 @@ def procesar_tarea_completada(mensaje: dict):
 def manejar_mensaje(ch, method, properties, body):
     try:
         mensaje = json.loads(body.decode("utf-8"))
-        procesar_tarea_completada(mensaje)
+        procesar_evento(mensaje)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except (json.JSONDecodeError, ValueError) as error:
         print(f"Evento mal formado: {error}")
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
-        print(f"No se pudo procesar tarea.completada: {error}")
-        logger.warning("No se pudo procesar tarea.completada: %s", error)
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+        print(f"No se pudo procesar evento RabbitMQ: {error}")
+        logger.warning("No se pudo procesar evento RabbitMQ: %s", error)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 
 def iniciar_consumidor():
@@ -129,7 +164,12 @@ def iniciar_consumidor():
         canal.queue_bind(
             exchange=EXCHANGE,
             queue=QUEUE,
-            routing_key=ROUTING_KEY,
+            routing_key=TAREA_COMPLETADA,
+        )
+        canal.queue_bind(
+            exchange=EXCHANGE,
+            queue=QUEUE,
+            routing_key=BLOQUE_COMPLETADO,
         )
         canal.basic_qos(prefetch_count=1)
         canal.basic_consume(
