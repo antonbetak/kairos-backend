@@ -299,8 +299,11 @@ services:
       SCHEDULE_DB_HOST: schedule_postgres
       SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT:-5432}
       SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       schedule_postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - kairos-network

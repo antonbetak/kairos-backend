@@ -14,6 +14,7 @@ from app.database import engine
 from app.schemas import ScheduleCreate
 from app.schemas import ScheduleResponse
 from app.schemas import ScheduleUpdate
+from app.services.rabbitmq_publisher import publicar_bloque_completado
 from app.services.stats_client import notificar_bloque_completado
 
 app = FastAPI(title="Kairos Schedule Service")
@@ -138,6 +139,12 @@ def actualizar_bloque(
 
     if status_anterior != "completed" and bloque.status == "completed":
         notificar_bloque_completado(str(id_usuario))
+        publicar_bloque_completado(
+            str(id_usuario),
+            str(bloque.id),
+            bloque.titulo,
+            bloque.tipo,
+        )
 
     return bloque
 
