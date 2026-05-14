@@ -52,3 +52,11 @@ class LogroUsuario(Base):
     desbloqueado = Column(Boolean, default=True)
     fecha_desbloqueo = Column(DateTime, default=datetime.utcnow)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
+
+
+class EventoProcesado(Base):
+    __tablename__ = "eventos_procesados"
+
+    event_id = Column(String, primary_key=True)
+    event_type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

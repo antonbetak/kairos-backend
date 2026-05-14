@@ -253,8 +253,11 @@ services:
       STATS_DB_HOST: stats_postgres
       STATS_DB_PORT: ${STATS_DB_PORT:-5432}
       STATS_DB_NAME: ${STATS_DB_NAME:-kairos_stats_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
     depends_on:
       stats_postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "8005:8000"

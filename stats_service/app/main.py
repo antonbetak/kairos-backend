@@ -1,4 +1,5 @@
 from uuid import UUID
+from threading import Thread
 
 from fastapi import Depends
 from fastapi import FastAPI
@@ -20,6 +21,7 @@ from app.services.estadisticas import registrar_bloque_completado
 from app.services.estadisticas import registrar_horario_creado
 from app.services.estadisticas import registrar_tarea_completada
 from app.services.estadisticas import registrar_tarea_creada
+from app.services.rabbitmq_consumer import iniciar_consumidor
 
 app = FastAPI(title="Kairos Stats Service")
 
@@ -45,6 +47,7 @@ def obtener_id_usuario(x_user_id: str | None = Header(default=None)):
 @app.on_event("startup")
 def iniciar_base_de_datos():
     Base.metadata.create_all(bind=engine)
+    Thread(target=iniciar_consumidor, daemon=True).start()
 
 
 @app.get("/health")
