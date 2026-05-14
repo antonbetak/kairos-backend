@@ -8,6 +8,7 @@ from app.models import EstadisticaUsuario
 from app.models import LogroUsuario
 from app.models import RachaUsuario
 from app.services.notifications_client import crear_notificacion_usuario
+from app.services.rabbitmq_publisher import publicar_evento_notificacion
 
 
 def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):
@@ -92,14 +93,29 @@ def desbloquear_logro_si_no_existe(
     db.add(logro)
     db.flush()
 
-    crear_notificacion_usuario(
+    routing_key = "racha.actualizada" if tipo_notificacion == "racha" else "logro.desbloqueado"
+    enviar_notificacion(
         id_usuario,
         titulo_notificacion or f"Desbloqueaste el logro: {titulo}",
         descripcion,
         tipo_notificacion,
+        routing_key,
     )
 
     return logro
+
+
+def enviar_notificacion(id_usuario: UUID, titulo: str, mensaje: str, tipo: str, routing_key: str):
+    publicado = publicar_evento_notificacion(
+        routing_key,
+        id_usuario,
+        tipo,
+        titulo,
+        mensaje,
+    )
+
+    if not publicado:
+        crear_notificacion_usuario(id_usuario, titulo, mensaje, tipo)
 
 
 def registrar_tarea_completada(db: Session, id_usuario: UUID):
@@ -130,11 +146,12 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
         racha.mejor_racha = racha.racha_actual
 
     if racha.racha_actual == 3:
-        crear_notificacion_usuario(
+        enviar_notificacion(
             id_usuario,
             "Racha activa",
             f"Llevas una racha de {racha.racha_actual} días",
             "racha",
+            "racha.actualizada",
         )
 
     if racha.racha_actual >= 3:
@@ -147,11 +164,12 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
         )
 
     if estadistica.tareas_creadas > 0 and estadistica.porcentaje_cumplimiento >= 100:
-        crear_notificacion_usuario(
+        enviar_notificacion(
             id_usuario,
             "Cumplimiento completo",
             f"Completaste el {round(estadistica.porcentaje_cumplimiento)}% de tus tareas",
             "cumplimiento",
+            "notificacion.creada",
         )
 
     racha.ultima_fecha_actividad = date.today()
