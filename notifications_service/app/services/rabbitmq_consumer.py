@@ -7,6 +7,7 @@ from uuid import UUID
 import pika
 
 from app.db import SessionLocal
+from app.models import EventoProcesado
 from app.models import NotificacionUsuario
 
 
@@ -14,6 +15,14 @@ RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE = "kairos.events"
 QUEUE = "notifications.eventos"
 ROUTING_KEYS = [
+    "tarea.creada",
+    "tarea.completada",
+    "tarea.abandonada",
+    "tarea.error",
+    "horario.creado",
+    "horario.actualizado",
+    "horario.error",
+    "bloque.completado",
     "notificacion.creada",
     "logro.desbloqueado",
     "racha.actualizada",
@@ -23,6 +32,22 @@ logger = logging.getLogger(__name__)
 
 
 def texto_por_defecto(event_type: str):
+    if event_type == "tarea.creada":
+        return "Tarea creada", "Se registró una nueva tarea", "recordatorio"
+    if event_type == "tarea.completada":
+        return "Tarea completada", "Completaste una tarea", "logro"
+    if event_type == "tarea.abandonada":
+        return "Tarea abandonada", "Una tarea fue descartada", "alerta"
+    if event_type == "tarea.error":
+        return "Error en tarea", "Ocurrió un problema al procesar una tarea", "alerta"
+    if event_type == "horario.creado":
+        return "Horario creado", "Se creó un nuevo horario", "recordatorio"
+    if event_type == "horario.actualizado":
+        return "Horario actualizado", "Tu horario fue actualizado", "recordatorio"
+    if event_type == "horario.error":
+        return "Error en horario", "Ocurrió un problema al procesar un horario", "alerta"
+    if event_type == "bloque.completado":
+        return "Bloque completado", "Completaste un bloque de concentración", "progreso"
     if event_type == "logro.desbloqueado":
         return "Logro desbloqueado", "Desbloqueaste un logro", "logro"
     if event_type == "racha.actualizada":
@@ -31,10 +56,11 @@ def texto_por_defecto(event_type: str):
 
 
 def crear_notificacion_desde_evento(mensaje: dict):
+    event_id = mensaje.get("event_id")
     event_type = mensaje.get("event_type")
     id_usuario = mensaje.get("id_usuario")
 
-    if not event_type or not id_usuario:
+    if not event_id or not event_type or not id_usuario:
         raise ValueError("Evento incompleto")
 
     titulo_default, mensaje_default, tipo_default = texto_por_defecto(event_type)
@@ -48,7 +74,22 @@ def crear_notificacion_desde_evento(mensaje: dict):
 
     db = SessionLocal()
     try:
+        evento_procesado = (
+            db.query(EventoProcesado)
+            .filter(EventoProcesado.event_id == event_id)
+            .first()
+        )
+        if evento_procesado:
+            print(f"Evento {event_type} ya procesado en notifications")
+            return
+
         db.add(notificacion)
+        db.add(
+            EventoProcesado(
+                event_id=event_id,
+                event_type=event_type,
+            )
+        )
         db.commit()
         print(f"Notificación guardada por evento {event_type}")
     except Exception:

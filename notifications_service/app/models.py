@@ -22,3 +22,11 @@ class NotificacionUsuario(Base):
     leida = Column(Boolean, default=False)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
     fecha_lectura = Column(DateTime, nullable=True)
+
+
+class EventoProcesado(Base):
+    __tablename__ = "eventos_procesados"
+
+    event_id = Column(String, primary_key=True)
+    event_type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

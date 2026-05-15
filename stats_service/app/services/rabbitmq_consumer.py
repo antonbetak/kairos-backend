@@ -11,14 +11,32 @@ from app.db import SessionLocal
 from app.models import EventoProcesado
 from app.models import EstadisticaUsuario
 from app.services.estadisticas import registrar_bloque_completado
+from app.services.estadisticas import registrar_horario_creado
 from app.services.estadisticas import registrar_tarea_completada
+from app.services.estadisticas import registrar_tarea_creada
 
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE = "kairos.events"
 QUEUE = "stats.eventos"
+TAREA_CREADA = "tarea.creada"
 TAREA_COMPLETADA = "tarea.completada"
+TAREA_ABANDONADA = "tarea.abandonada"
+TAREA_ERROR = "tarea.error"
+HORARIO_CREADO = "horario.creado"
+HORARIO_ACTUALIZADO = "horario.actualizado"
+HORARIO_ERROR = "horario.error"
 BLOQUE_COMPLETADO = "bloque.completado"
+ROUTING_KEYS = [
+    TAREA_CREADA,
+    TAREA_COMPLETADA,
+    TAREA_ABANDONADA,
+    TAREA_ERROR,
+    HORARIO_CREADO,
+    HORARIO_ACTUALIZADO,
+    HORARIO_ERROR,
+    BLOQUE_COMPLETADO,
+]
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +117,25 @@ def procesar_tarea_completada(db, mensaje: dict):
     print("Evento tarea.completada recibido en stats")
 
 
+def procesar_tarea_creada(db, mensaje: dict):
+    event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
+
+    if evento_ya_procesado(db, event_id):
+        print("Evento tarea.creada ya procesado")
+        return
+
+    if ya_llego_por_http(db, id_usuario, mensaje, "tareas_creadas"):
+        guardar_evento_procesado(db, event_id, event_type or TAREA_CREADA)
+        db.commit()
+        print("Evento tarea.creada ya aplicado por HTTP")
+        return
+
+    registrar_tarea_creada(db, id_usuario)
+    guardar_evento_procesado(db, event_id, event_type or TAREA_CREADA)
+    db.commit()
+    print("Evento tarea.creada recibido en stats")
+
+
 def procesar_bloque_completado(db, mensaje: dict):
     event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
 
@@ -118,14 +155,56 @@ def procesar_bloque_completado(db, mensaje: dict):
     print("Evento bloque.completado recibido en stats")
 
 
+def procesar_horario_creado(db, mensaje: dict):
+    event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
+
+    if evento_ya_procesado(db, event_id):
+        print("Evento horario.creado ya procesado")
+        return
+
+    if ya_llego_por_http(db, id_usuario, mensaje, "horarios_creados"):
+        guardar_evento_procesado(db, event_id, event_type or HORARIO_CREADO)
+        db.commit()
+        print("Evento horario.creado ya aplicado por HTTP")
+        return
+
+    registrar_horario_creado(db, id_usuario)
+    guardar_evento_procesado(db, event_id, event_type or HORARIO_CREADO)
+    db.commit()
+    print("Evento horario.creado recibido en stats")
+
+
+def registrar_evento_sin_metrica(db, mensaje: dict):
+    event_id, event_type, _ = datos_basicos_evento(mensaje)
+
+    if evento_ya_procesado(db, event_id):
+        print(f"Evento {event_type} ya procesado")
+        return
+
+    guardar_evento_procesado(db, event_id, event_type or "evento.sin_metrica")
+    db.commit()
+    print(f"Evento {event_type} registrado sin cambio de métricas")
+
+
 def procesar_evento(mensaje: dict):
     event_type = mensaje.get("event_type")
     db = SessionLocal()
     try:
-        if event_type == TAREA_COMPLETADA:
+        if event_type == TAREA_CREADA:
+            procesar_tarea_creada(db, mensaje)
+        elif event_type == TAREA_COMPLETADA:
             procesar_tarea_completada(db, mensaje)
+        elif event_type == HORARIO_CREADO:
+            procesar_horario_creado(db, mensaje)
         elif event_type == BLOQUE_COMPLETADO:
             procesar_bloque_completado(db, mensaje)
+        elif event_type in (
+            TAREA_ABANDONADA,
+            TAREA_ERROR,
+            HORARIO_ACTUALIZADO,
+            HORARIO_ERROR,
+        ):
+            registrar_evento_sin_metrica(db, mensaje)
         else:
             raise ValueError("Tipo de evento no soportado")
     except Exception:
@@ -161,16 +240,12 @@ def iniciar_consumidor():
             durable=True,
         )
         canal.queue_declare(queue=QUEUE, durable=True)
-        canal.queue_bind(
-            exchange=EXCHANGE,
-            queue=QUEUE,
-            routing_key=TAREA_COMPLETADA,
-        )
-        canal.queue_bind(
-            exchange=EXCHANGE,
-            queue=QUEUE,
-            routing_key=BLOQUE_COMPLETADO,
-        )
+        for routing_key in ROUTING_KEYS:
+            canal.queue_bind(
+                exchange=EXCHANGE,
+                queue=QUEUE,
+                routing_key=routing_key,
+            )
         canal.basic_qos(prefetch_count=1)
         canal.basic_consume(
             queue=QUEUE,

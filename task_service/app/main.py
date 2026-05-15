@@ -12,7 +12,10 @@ from app.database import engine
 from app.schemas import TareaActualizar
 from app.schemas import TareaCrear
 from app.schemas import TareaRespuesta
+from app.services.rabbitmq_publisher import publicar_tarea_abandonada
 from app.services.rabbitmq_publisher import publicar_tarea_completada
+from app.services.rabbitmq_publisher import publicar_tarea_creada
+from app.services.rabbitmq_publisher import publicar_tarea_error
 from app.services.stats_client import notificar_tarea_completada
 
 app = FastAPI(title="Kairos Task Service")
@@ -71,9 +74,21 @@ def crear_tarea(
         completada=False,
     )
 
-    db.add(nueva_tarea)
-    db.commit()
-    db.refresh(nueva_tarea)
+    try:
+        db.add(nueva_tarea)
+        db.commit()
+        db.refresh(nueva_tarea)
+    except Exception as error:
+        db.rollback()
+        publicar_tarea_error(id_usuario, str(error))
+        raise
+
+    publicar_tarea_creada(
+        id_usuario,
+        str(nueva_tarea.id_tarea),
+        nueva_tarea.titulo,
+        nueva_tarea.descripcion,
+    )
 
     return nueva_tarea
 
@@ -96,9 +111,14 @@ def actualizar_tarea(
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
 
     estaba_completada = tarea.completada
-    tarea.completada = datos.completada
-    db.commit()
-    db.refresh(tarea)
+    try:
+        tarea.completada = datos.completada
+        db.commit()
+        db.refresh(tarea)
+    except Exception as error:
+        db.rollback()
+        publicar_tarea_error(id_usuario, str(error), str(id_tarea))
+        raise
 
     if not estaba_completada and tarea.completada:
         notificar_tarea_completada(id_usuario)
@@ -127,7 +147,16 @@ def eliminar_tarea(
     if not tarea:
         raise HTTPException(status_code=404, detail="Tarea no encontrada")
 
-    db.delete(tarea)
-    db.commit()
+    titulo = tarea.titulo
+    try:
+        db.delete(tarea)
+        db.commit()
+    except Exception as error:
+        db.rollback()
+        publicar_tarea_error(id_usuario, str(error), str(id_tarea))
+        raise
+
+    # El modelo actual no tiene estado "abandonada"; delete representa descarte.
+    publicar_tarea_abandonada(id_usuario, str(id_tarea), titulo)
 
     return {"message": "Tarea eliminada"}

@@ -14,15 +14,28 @@ EXCHANGE = "kairos.events"
 logger = logging.getLogger(__name__)
 
 
-def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
+def publicar_evento_tarea(
+    routing_key: str,
+    id_usuario: str,
+    id_tarea: str | None = None,
+    titulo: str | None = None,
+    descripcion: str | None = None,
+    error: str | None = None,
+):
     mensaje = {
         "event_id": str(uuid4()),
-        "event_type": "tarea.completada",
+        "event_type": routing_key,
         "id_usuario": id_usuario,
-        "id_tarea": id_tarea,
-        "titulo": titulo,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    if id_tarea:
+        mensaje["id_tarea"] = id_tarea
+    if titulo:
+        mensaje["titulo"] = titulo
+    if descripcion:
+        mensaje["descripcion"] = descripcion
+    if error:
+        mensaje["error"] = error
 
     try:
         parametros = pika.URLParameters(RABBITMQ_URL)
@@ -36,16 +49,55 @@ def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
         )
         canal.basic_publish(
             exchange=EXCHANGE,
-            routing_key="tarea.completada",
+            routing_key=routing_key,
             body=json.dumps(mensaje),
             properties=pika.BasicProperties(
-                delivery_mode=2,
+                delivery_mode=pika.DeliveryMode.Persistent,
                 content_type="application/json",
             ),
         )
         conexion.close()
-        print("Evento tarea.completada publicado")
-        logger.info("Evento tarea.completada publicado")
+        print(f"Evento {routing_key} publicado")
+        logger.info("Evento %s publicado", routing_key)
+        return True
     except Exception as error:
-        print(f"No se pudo publicar tarea.completada: {error}")
-        logger.warning("No se pudo publicar tarea.completada: %s", error)
+        print(f"No se pudo publicar {routing_key}: {error}")
+        logger.warning("No se pudo publicar %s: %s", routing_key, error)
+        return False
+
+
+def publicar_tarea_creada(id_usuario: str, id_tarea: str, titulo: str, descripcion: str | None):
+    return publicar_evento_tarea(
+        "tarea.creada",
+        id_usuario,
+        id_tarea,
+        titulo,
+        descripcion,
+    )
+
+
+def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
+    return publicar_evento_tarea(
+        "tarea.completada",
+        id_usuario,
+        id_tarea,
+        titulo,
+    )
+
+
+def publicar_tarea_abandonada(id_usuario: str, id_tarea: str, titulo: str):
+    return publicar_evento_tarea(
+        "tarea.abandonada",
+        id_usuario,
+        id_tarea,
+        titulo,
+    )
+
+
+def publicar_tarea_error(id_usuario: str, error: str, id_tarea: str | None = None):
+    return publicar_evento_tarea(
+        "tarea.error",
+        id_usuario,
+        id_tarea,
+        error=error,
+    )

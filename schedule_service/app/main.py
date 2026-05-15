@@ -15,6 +15,9 @@ from app.schemas import ScheduleCreate
 from app.schemas import ScheduleResponse
 from app.schemas import ScheduleUpdate
 from app.services.rabbitmq_publisher import publicar_bloque_completado
+from app.services.rabbitmq_publisher import publicar_horario_actualizado
+from app.services.rabbitmq_publisher import publicar_horario_creado
+from app.services.rabbitmq_publisher import publicar_horario_error
 from app.services.stats_client import notificar_bloque_completado
 
 app = FastAPI(title="Kairos Schedule Service")
@@ -64,9 +67,22 @@ def crear_bloque(
         status=datos.status,
     )
 
-    db.add(bloque)
-    db.commit()
-    db.refresh(bloque)
+    try:
+        db.add(bloque)
+        db.commit()
+        db.refresh(bloque)
+    except Exception as error:
+        db.rollback()
+        publicar_horario_error(str(id_usuario), str(error))
+        raise
+
+    publicar_horario_creado(
+        str(id_usuario),
+        str(bloque.id),
+        bloque.titulo,
+        bloque.tipo,
+        bloque.status,
+    )
 
     return bloque
 
@@ -130,12 +146,17 @@ def actualizar_bloque(
 
     status_anterior = bloque.status
 
-    for campo, valor in datos.model_dump(exclude_unset=True).items():
-        setattr(bloque, campo, valor)
+    try:
+        for campo, valor in datos.model_dump(exclude_unset=True).items():
+            setattr(bloque, campo, valor)
 
-    bloque.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(bloque)
+        bloque.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(bloque)
+    except Exception as error:
+        db.rollback()
+        publicar_horario_error(str(id_usuario), str(error), str(schedule_id))
+        raise
 
     if status_anterior != "completed" and bloque.status == "completed":
         notificar_bloque_completado(str(id_usuario))
@@ -145,6 +166,14 @@ def actualizar_bloque(
             bloque.titulo,
             bloque.tipo,
         )
+
+    publicar_horario_actualizado(
+        str(id_usuario),
+        str(bloque.id),
+        bloque.titulo,
+        bloque.tipo,
+        bloque.status,
+    )
 
     return bloque
 
