@@ -15,13 +15,14 @@ RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
 EXCHANGE = "kairos.events"
 QUEUE = "notifications.eventos"
 ROUTING_KEYS = [
-    "tarea.creada",
-    "tarea.completada",
-    "tarea.abandonada",
-    "tarea.error",
-    "horario.creado",
-    "horario.actualizado",
-    "horario.error",
+    "Task.Created",
+    "Task.Completed",
+    "Task.Ditch",
+    "Task.Error",
+    "Schedule.Created",
+    "Schedule.Updated",
+    "Schedule.Error",
+    "Task.DueWarning",
     "bloque.completado",
     "notificacion.creada",
     "logro.desbloqueado",
@@ -32,20 +33,22 @@ logger = logging.getLogger(__name__)
 
 
 def texto_por_defecto(event_type: str):
-    if event_type == "tarea.creada":
+    if event_type == "Task.Created":
         return "Tarea creada", "Se registró una nueva tarea", "recordatorio"
-    if event_type == "tarea.completada":
+    if event_type == "Task.Completed":
         return "Tarea completada", "Completaste una tarea", "logro"
-    if event_type == "tarea.abandonada":
+    if event_type == "Task.Ditch":
         return "Tarea abandonada", "Una tarea fue descartada", "alerta"
-    if event_type == "tarea.error":
+    if event_type == "Task.Error":
         return "Error en tarea", "Ocurrió un problema al procesar una tarea", "alerta"
-    if event_type == "horario.creado":
+    if event_type == "Schedule.Created":
         return "Horario creado", "Se creó un nuevo horario", "recordatorio"
-    if event_type == "horario.actualizado":
+    if event_type == "Schedule.Updated":
         return "Horario actualizado", "Tu horario fue actualizado", "recordatorio"
-    if event_type == "horario.error":
+    if event_type == "Schedule.Error":
         return "Error en horario", "Ocurrió un problema al procesar un horario", "alerta"
+    if event_type == "Task.DueWarning":
+        return "Tarea próxima a vencer", "Tienes una tarea cercana a su vencimiento", "recordatorio"
     if event_type == "bloque.completado":
         return "Bloque completado", "Completaste un bloque de concentración", "progreso"
     if event_type == "logro.desbloqueado":

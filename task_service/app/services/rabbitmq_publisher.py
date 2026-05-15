@@ -21,6 +21,10 @@ def publicar_evento_tarea(
     titulo: str | None = None,
     descripcion: str | None = None,
     error: str | None = None,
+    due_at: str | None = None,
+    google_access_token: str | None = None,
+    google_refresh_token: str | None = None,
+    minutes_left: int | None = None,
 ):
     mensaje = {
         "event_id": str(uuid4()),
@@ -36,6 +40,14 @@ def publicar_evento_tarea(
         mensaje["descripcion"] = descripcion
     if error:
         mensaje["error"] = error
+    if due_at:
+        mensaje["due_at"] = due_at
+    if google_access_token:
+        mensaje["google_access_token"] = google_access_token
+    if google_refresh_token:
+        mensaje["google_refresh_token"] = google_refresh_token
+    if minutes_left is not None:
+        mensaje["minutes_left"] = minutes_left
 
     try:
         parametros = pika.URLParameters(RABBITMQ_URL)
@@ -66,19 +78,30 @@ def publicar_evento_tarea(
         return False
 
 
-def publicar_tarea_creada(id_usuario: str, id_tarea: str, titulo: str, descripcion: str | None):
+def publicar_tarea_creada(
+    id_usuario: str,
+    id_tarea: str,
+    titulo: str,
+    descripcion: str | None,
+    due_at: str | None = None,
+    google_access_token: str | None = None,
+    google_refresh_token: str | None = None,
+):
     return publicar_evento_tarea(
-        "tarea.creada",
+        "Task.Created",
         id_usuario,
         id_tarea,
         titulo,
         descripcion,
+        due_at=due_at,
+        google_access_token=google_access_token,
+        google_refresh_token=google_refresh_token,
     )
 
 
 def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
-        "tarea.completada",
+        "Task.Completed",
         id_usuario,
         id_tarea,
         titulo,
@@ -87,7 +110,7 @@ def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
 
 def publicar_tarea_abandonada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
-        "tarea.abandonada",
+        "Task.Ditch",
         id_usuario,
         id_tarea,
         titulo,
@@ -96,8 +119,27 @@ def publicar_tarea_abandonada(id_usuario: str, id_tarea: str, titulo: str):
 
 def publicar_tarea_error(id_usuario: str, error: str, id_tarea: str | None = None):
     return publicar_evento_tarea(
-        "tarea.error",
+        "Task.Error",
         id_usuario,
         id_tarea,
         error=error,
+    )
+
+
+def publicar_tarea_due_warning(
+    id_usuario: str,
+    id_tarea: str,
+    titulo: str,
+    descripcion: str | None,
+    due_at: str,
+    minutes_left: int,
+):
+    return publicar_evento_tarea(
+        "Task.DueWarning",
+        id_usuario,
+        id_tarea,
+        titulo,
+        descripcion,
+        due_at=due_at,
+        minutes_left=minutes_left,
     )

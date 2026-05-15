@@ -4,6 +4,7 @@ from fastapi import Header
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
+from threading import Thread
 
 from app import models
 from app.database import Base
@@ -16,7 +17,7 @@ from app.services.rabbitmq_publisher import publicar_tarea_abandonada
 from app.services.rabbitmq_publisher import publicar_tarea_completada
 from app.services.rabbitmq_publisher import publicar_tarea_creada
 from app.services.rabbitmq_publisher import publicar_tarea_error
-from app.services.stats_client import notificar_tarea_completada
+from app.services.due_warning import iniciar_verificador_vencimientos
 
 app = FastAPI(title="Kairos Task Service")
 
@@ -36,9 +37,17 @@ def obtener_id_usuario(x_user_id: str | None = Header(default=None)):
     return x_user_id
 
 
+def obtener_token_google(
+    x_google_token: str | None = Header(default=None, alias="X-Google-Token"),
+    x_google_refresh: str | None = Header(default=None, alias="X-Google-Refresh"),
+):
+    return x_google_token, x_google_refresh
+
+
 @app.on_event("startup")
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    Thread(target=iniciar_verificador_vencimientos, daemon=True).start()
 
 
 @app.get("/health")
@@ -65,6 +74,7 @@ def listar_tareas(
 def crear_tarea(
     tarea: TareaCrear,
     id_usuario: str = Depends(obtener_id_usuario),
+    google_tokens: tuple[str | None, str | None] = Depends(obtener_token_google),
     db: Session = Depends(get_db),
 ):
     nueva_tarea = models.Tarea(
@@ -72,6 +82,7 @@ def crear_tarea(
         titulo=tarea.titulo,
         descripcion=tarea.descripcion,
         completada=False,
+        due_at=tarea.due_at,
     )
 
     try:
@@ -88,6 +99,9 @@ def crear_tarea(
         str(nueva_tarea.id_tarea),
         nueva_tarea.titulo,
         nueva_tarea.descripcion,
+        due_at=nueva_tarea.due_at.isoformat() if nueva_tarea.due_at else None,
+        google_access_token=google_tokens[0],
+        google_refresh_token=google_tokens[1],
     )
 
     return nueva_tarea
@@ -113,6 +127,9 @@ def actualizar_tarea(
     estaba_completada = tarea.completada
     try:
         tarea.completada = datos.completada
+        if datos.due_at is not None:
+            tarea.due_at = datos.due_at
+            tarea.due_warning_sent_at = None
         db.commit()
         db.refresh(tarea)
     except Exception as error:
@@ -121,7 +138,6 @@ def actualizar_tarea(
         raise
 
     if not estaba_completada and tarea.completada:
-        notificar_tarea_completada(id_usuario)
         publicar_tarea_completada(
             id_usuario,
             str(tarea.id_tarea),

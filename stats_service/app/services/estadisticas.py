@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 from app.models import EstadisticaUsuario
 from app.models import LogroUsuario
 from app.models import RachaUsuario
-from app.services.notifications_client import crear_notificacion_usuario
-from app.services.rabbitmq_publisher import publicar_evento_notificacion
+from app.services.rabbitmq_publisher import publicar_logro_desbloqueado
+from app.services.rabbitmq_publisher import publicar_notificacion_creada
+from app.services.rabbitmq_publisher import publicar_racha_actualizada
 
 
 def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):
@@ -93,29 +94,29 @@ def desbloquear_logro_si_no_existe(
     db.add(logro)
     db.flush()
 
-    routing_key = "racha.actualizada" if tipo_notificacion == "racha" else "logro.desbloqueado"
-    enviar_notificacion(
-        id_usuario,
-        titulo_notificacion or f"Desbloqueaste el logro: {titulo}",
-        descripcion,
-        tipo_notificacion,
-        routing_key,
-    )
+    if tipo_notificacion == "racha":
+        publicar_racha_actualizada(
+            id_usuario,
+            titulo_notificacion or f"Desbloqueaste el logro: {titulo}",
+            descripcion,
+        )
+    else:
+        publicar_logro_desbloqueado(
+            id_usuario,
+            titulo_notificacion or f"Desbloqueaste el logro: {titulo}",
+            descripcion,
+        )
 
     return logro
 
 
 def enviar_notificacion(id_usuario: UUID, titulo: str, mensaje: str, tipo: str, routing_key: str):
-    publicado = publicar_evento_notificacion(
-        routing_key,
-        id_usuario,
-        tipo,
-        titulo,
-        mensaje,
-    )
+    if routing_key == "racha.actualizada":
+        return publicar_racha_actualizada(id_usuario, titulo, mensaje)
+    if routing_key == "notificacion.creada":
+        return publicar_notificacion_creada(id_usuario, titulo, mensaje, tipo)
 
-    if not publicado:
-        crear_notificacion_usuario(id_usuario, titulo, mensaje, tipo)
+    return publicar_logro_desbloqueado(id_usuario, titulo, mensaje)
 
 
 def registrar_tarea_completada(db: Session, id_usuario: UUID):
@@ -172,6 +173,23 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
             "notificacion.creada",
         )
 
+    racha.ultima_fecha_actividad = date.today()
+
+    db.commit()
+    db.refresh(estadistica)
+    db.refresh(racha)
+
+    return estadistica
+
+
+def registrar_tarea_abandonada(db: Session, id_usuario: UUID):
+    estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
+    racha = obtener_o_crear_racha_usuario(db, id_usuario, "tareas")
+
+    if racha.racha_actual > 0:
+        racha.racha_actual -= 1
+
+    estadistica.fecha_actualizacion = datetime.utcnow()
     racha.ultima_fecha_actividad = date.today()
 
     db.commit()

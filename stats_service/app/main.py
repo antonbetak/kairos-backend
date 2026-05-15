@@ -17,10 +17,6 @@ from app.schemas import RachaRespuesta
 from app.services.estadisticas import obtener_o_crear_estadistica_usuario
 from app.services.estadisticas import obtener_o_crear_racha_usuario
 from app.services.estadisticas import listar_logros_usuario
-from app.services.estadisticas import registrar_bloque_completado
-from app.services.estadisticas import registrar_horario_creado
-from app.services.estadisticas import registrar_tarea_completada
-from app.services.estadisticas import registrar_tarea_creada
 from app.services.rabbitmq_consumer import iniciar_consumidor
 
 app = FastAPI(title="Kairos Stats Service")
@@ -78,35 +74,3 @@ def listar_logros(
     db: Session = Depends(get_db),
 ):
     return listar_logros_usuario(db, id_usuario)
-
-
-@app.post("/eventos/tarea-completada", response_model=EstadisticaRespuesta)
-def registrar_evento_tarea_completada(
-    id_usuario: UUID = Depends(obtener_id_usuario),
-    db: Session = Depends(get_db),
-):
-    return registrar_tarea_completada(db, id_usuario)
-
-
-@app.post("/eventos/tarea-creada", response_model=EstadisticaRespuesta)
-def registrar_evento_tarea_creada(
-    id_usuario: UUID = Depends(obtener_id_usuario),
-    db: Session = Depends(get_db),
-):
-    return registrar_tarea_creada(db, id_usuario)
-
-
-@app.post("/eventos/horario-creado", response_model=EstadisticaRespuesta)
-def registrar_evento_horario_creado(
-    id_usuario: UUID = Depends(obtener_id_usuario),
-    db: Session = Depends(get_db),
-):
-    return registrar_horario_creado(db, id_usuario)
-
-
-@app.post("/eventos/bloque-completado", response_model=EstadisticaRespuesta)
-def registrar_evento_bloque_completado(
-    id_usuario: UUID = Depends(obtener_id_usuario),
-    db: Session = Depends(get_db),
-):
-    return registrar_bloque_completado(db, id_usuario)

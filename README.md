@@ -73,6 +73,57 @@ curl http://localhost:8000/health
 
 Solo el API Gateway expone puertos al host; el resto de servicios quedan en red interna.
 
+# Eventos AMQP
+
+Kairos usa RabbitMQ para la propagacion asíncrona entre microservicios. Los servicios ya no deben llamarse entre sí por HTTP para mover eventos de dominio.
+
+- `Task.Created`: lo publica `task_service`; lo consumen `notifications_service`, `schedule_service` y `stats_service`.
+- `Task.Completed`: lo publica `task_service`; lo consumen `notifications_service` y `stats_service`.
+- `Task.Ditch`: lo publica `task_service`; lo consumen `notifications_service` y `stats_service`.
+- `Task.Error`: lo publica `task_service`; queda para monitoreo/auditoría.
+- `Task.DueWarning`: lo publica `task_service`; lo consume `notifications_service`.
+- `Task.Created`: también lo consume `calendar_service` para sincronizar en Google Calendar cuando llega `X-Google-Token`.
+- `Schedule.Created`: lo publica `schedule_service`; lo consumen `notifications_service`, `stats_service` y `calendar_service`.
+- `Schedule.Updated`: lo publica `schedule_service`; lo consumen `notifications_service` y `stats_service`.
+- `Schedule.Error`: lo publica `schedule_service`; queda para monitoreo/auditoría.
+- `bloque.completado`: evento adicional de negocio que se conserva porque sigue siendo coherente con el flujo actual.
+
+`agent_service` solo deja definidos los contratos de `Task.Created` y `Schedule.Created` como consumidores futuros, y el contrato de publicación de recomendaciones RAG queda como stub pendiente.
+
+## Como funciona
+
+`task_service` publica `Task.Created` con `due_at` y, si el request incluye `X-Google-Token` y opcionalmente `X-Google-Refresh`, `calendar_service` intenta crear el evento en Google Calendar. Si `due_at` existe, `task_service` además dispara `Task.DueWarning` cuando la tarea entra en la ventana de aviso configurada actualmente en 15 minutos.
+
+`schedule_service` publica `Schedule.Created` con `fecha_inicio` y `fecha_fin`, y `calendar_service` lo sincroniza en Google Calendar con la misma ventana horaria. `notifications_service` sigue consumiendo `Task.DueWarning` para crear la notificación de recordatorio.
+
+## Como probarlo
+
+1. Arranca RabbitMQ y el stack completo con `docker compose up --build`.
+2. Obtén un `X-Google-Token` válido desde `google_auth`.
+3. Crea una tarea con vencimiento cercano:
+
+```bash
+curl -X POST http://localhost:8000/tasks \
+  -H "X-User-Id: <uuid-usuario>" \
+  -H "X-Google-Token: <access_token_google>" \
+  -H "Content-Type: application/json" \
+  -d '{"titulo":"Revisar informe","descripcion":"Pendiente de hoy","due_at":"2026-05-14T18:30:00Z"}'
+```
+
+4. Verifica en los logs de `calendar_service` que se consumió `Task.Created` y se intentó sincronizar en Google Calendar.
+5. Crea un horario:
+
+```bash
+curl -X POST http://localhost:8000/schedule \
+  -H "X-User-Id: <uuid-usuario>" \
+  -H "X-Google-Token: <access_token_google>" \
+  -H "Content-Type: application/json" \
+  -d '{"titulo":"Bloque profundo","descripcion":"Trabajo concentrado","fecha_inicio":"2026-05-14T19:00:00Z","fecha_fin":"2026-05-14T20:00:00Z","tipo":"focus","status":"planned"}'
+```
+
+6. Verifica en Google Calendar o en los logs del `calendar_service` que `Schedule.Created` fue sincronizado.
+7. Para `Task.DueWarning`, crea una tarea con `due_at` dentro de 15 minutos y revisa el log de `task_service` y la lista de `notifications_service`; la notificación debería aparecer cuando el verificador detecte la ventana.
+
 Nota: `docker-compose.dev.yml` y `docker-compose.prod.yml` cubren el stack de Google (auth/calendar/fit). Para el stack completo usa `docker-compose.yml`.
 
 ## Networks en Docker Compose

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from datetime import datetime
 from datetime import timezone
+from threading import Thread
 
 from app import models
 from app.database import Base
@@ -18,7 +19,7 @@ from app.services.rabbitmq_publisher import publicar_bloque_completado
 from app.services.rabbitmq_publisher import publicar_horario_actualizado
 from app.services.rabbitmq_publisher import publicar_horario_creado
 from app.services.rabbitmq_publisher import publicar_horario_error
-from app.services.stats_client import notificar_bloque_completado
+from app.services.rabbitmq_consumer import iniciar_consumidor
 
 app = FastAPI(title="Kairos Schedule Service")
 
@@ -38,9 +39,17 @@ def obtener_id_usuario(x_user_id: UUID | None = Header(default=None)):
     return x_user_id
 
 
+def obtener_token_google(
+    x_google_token: str | None = Header(default=None, alias="X-Google-Token"),
+    x_google_refresh: str | None = Header(default=None, alias="X-Google-Refresh"),
+):
+    return x_google_token, x_google_refresh
+
+
 @app.on_event("startup")
 def crear_tablas():
     Base.metadata.create_all(bind=engine)
+    Thread(target=iniciar_consumidor, daemon=True).start()
 
 
 @app.get("/health")
@@ -52,6 +61,7 @@ def health():
 def crear_bloque(
     datos: ScheduleCreate,
     id_usuario: UUID = Depends(obtener_id_usuario),
+    google_tokens: tuple[str | None, str | None] = Depends(obtener_token_google),
     db: Session = Depends(get_db),
 ):
     if datos.fecha_fin <= datos.fecha_inicio:
@@ -80,8 +90,13 @@ def crear_bloque(
         str(id_usuario),
         str(bloque.id),
         bloque.titulo,
+        bloque.descripcion,
+        bloque.fecha_inicio.isoformat(),
+        bloque.fecha_fin.isoformat(),
         bloque.tipo,
         bloque.status,
+        google_access_token=google_tokens[0],
+        google_refresh_token=google_tokens[1],
     )
 
     return bloque
@@ -159,7 +174,6 @@ def actualizar_bloque(
         raise
 
     if status_anterior != "completed" and bloque.status == "completed":
-        notificar_bloque_completado(str(id_usuario))
         publicar_bloque_completado(
             str(id_usuario),
             str(bloque.id),
@@ -171,6 +185,9 @@ def actualizar_bloque(
         str(id_usuario),
         str(bloque.id),
         bloque.titulo,
+        bloque.descripcion,
+        bloque.fecha_inicio.isoformat(),
+        bloque.fecha_fin.isoformat(),
         bloque.tipo,
         bloque.status,
     )

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import logging
+from threading import Thread
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,7 @@ from app.config import get_settings
 from app.routes.device_calendar import router as device_calendar_router
 from app.routes.google_calendar import router as google_calendar_router
 from app.routes.health import router as health_router
+from app.services.rabbitmq_consumer import iniciar_consumidor
 
 
 settings = get_settings()
@@ -22,6 +24,7 @@ logger = logging.getLogger(settings.app_name)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
 	logger.info("Starting %s in %s mode", settings.app_name, settings.app_env)
+	Thread(target=iniciar_consumidor, daemon=True).start()
 	yield
 	logger.info("Stopping %s", settings.app_name)
 

@@ -47,7 +47,7 @@ def publicar_evento_notificacion(
             routing_key=routing_key,
             body=json.dumps(evento),
             properties=pika.BasicProperties(
-                delivery_mode=2,
+                delivery_mode=pika.DeliveryMode.Persistent,
                 content_type="application/json",
             ),
         )
@@ -58,3 +58,33 @@ def publicar_evento_notificacion(
         print(f"No se pudo publicar {routing_key}: {error}")
         logger.warning("No se pudo publicar %s: %s", routing_key, error)
         return False
+
+
+def publicar_logro_desbloqueado(id_usuario: UUID, titulo: str, mensaje: str):
+    return publicar_evento_notificacion(
+        "logro.desbloqueado",
+        id_usuario,
+        "logro",
+        titulo,
+        mensaje,
+    )
+
+
+def publicar_racha_actualizada(id_usuario: UUID, titulo: str, mensaje: str):
+    return publicar_evento_notificacion(
+        "racha.actualizada",
+        id_usuario,
+        "racha",
+        titulo,
+        mensaje,
+    )
+
+
+def publicar_notificacion_creada(id_usuario: UUID, titulo: str, mensaje: str, tipo: str):
+    return publicar_evento_notificacion(
+        "notificacion.creada",
+        id_usuario,
+        tipo,
+        titulo,
+        mensaje,
+    )
