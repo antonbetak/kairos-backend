@@ -35,6 +35,50 @@ curl http://localhost:8000/health/notifications_service
 4. Verificar que `stats_service` actualice estadísticas.
 5. Verificar que `notifications_service` cree una notificación.
 
+### Evidencia en Thunder Client
+
+#### Ver horarios
+
+```http
+GET http://localhost:8000/schedule
+```
+
+Resultado esperado: `200 OK`.
+
+![GET schedule](img/schedule_get.png)
+
+#### Crear horario
+
+```http
+POST http://localhost:8000/schedule
+```
+
+Resultado esperado: `200 OK` y respuesta con el `id` del bloque creado.
+
+![POST schedule](img/schedule_post.png)
+
+#### Modificar horario
+
+```http
+PATCH http://localhost:8000/schedule/{id}
+```
+
+Resultado esperado: `200 OK` y respuesta con los datos actualizados.
+
+![PATCH schedule](img/schedule_patch.png)
+
+#### Eliminar horario
+
+```http
+DELETE http://localhost:8000/schedule/{id}
+```
+
+Resultado esperado: `200 OK` y mensaje `Bloque eliminado`.
+
+![DELETE schedule](img/schedule_delete.png)
+
+
+
 ## Logs útiles
 
 ```bash
