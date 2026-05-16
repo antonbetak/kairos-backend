@@ -18,6 +18,7 @@ def publicar_evento_tarea(
     routing_key: str,
     id_usuario: str,
     id_tarea: str | None = None,
+    request_id: str | None = None,
     titulo: str | None = None,
     descripcion: str | None = None,
     error: str | None = None,
@@ -34,6 +35,8 @@ def publicar_evento_tarea(
     }
     if id_tarea:
         mensaje["id_tarea"] = id_tarea
+    if request_id:
+        mensaje["request_id"] = request_id
     if titulo:
         mensaje["titulo"] = titulo
     if descripcion:
@@ -69,11 +72,9 @@ def publicar_evento_tarea(
             ),
         )
         conexion.close()
-        print(f"Evento {routing_key} publicado")
         logger.info("Evento %s publicado", routing_key)
         return True
     except Exception as error:
-        print(f"No se pudo publicar {routing_key}: {error}")
         logger.warning("No se pudo publicar %s: %s", routing_key, error)
         return False
 
@@ -81,6 +82,7 @@ def publicar_evento_tarea(
 def publicar_tarea_creada(
     id_usuario: str,
     id_tarea: str,
+    request_id: str,
     titulo: str,
     descripcion: str | None,
     due_at: str | None = None,
@@ -91,6 +93,7 @@ def publicar_tarea_creada(
         "Task.Created",
         id_usuario,
         id_tarea,
+        request_id,
         titulo,
         descripcion,
         due_at=due_at,

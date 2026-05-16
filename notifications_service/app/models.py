@@ -15,6 +15,7 @@ class NotificacionUsuario(Base):
     __tablename__ = "notificaciones_usuario"
 
     id_notificacion = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    request_id = Column(UUID(as_uuid=True), unique=True, nullable=True, index=True)
     id_usuario = Column(UUID(as_uuid=True), nullable=False, index=True)
     titulo = Column(String, nullable=False)
     mensaje = Column(Text, nullable=False)

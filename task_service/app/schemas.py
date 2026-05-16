@@ -9,6 +9,7 @@ class TareaCrear(BaseModel):
     titulo: str
     descripcion: str | None = None
     due_at: datetime | None = None
+    request_id: UUID | None = None
 
 
 class TareaActualizar(BaseModel):
@@ -20,6 +21,7 @@ class TareaRespuesta(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id_tarea: UUID
+    request_id: UUID | None
     id_usuario: str
     titulo: str
     descripcion: str | None

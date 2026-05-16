@@ -23,10 +23,9 @@ def manejar_mensaje(ch, method, properties, body):
         )
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except (json.JSONDecodeError, ValueError) as error:
-        print(f"Evento mal formado en schedule: {error}")
+        logger.warning("Evento mal formado en schedule: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
-        print(f"No se pudo procesar evento RabbitMQ en schedule: {error}")
         logger.warning("No se pudo procesar evento RabbitMQ en schedule: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
@@ -56,9 +55,8 @@ def iniciar_consumidor():
                 on_message_callback=manejar_mensaje,
             )
 
-            print("Consumidor RabbitMQ de schedule iniciado")
+            logger.info("Consumidor RabbitMQ de schedule iniciado")
             canal.start_consuming()
         except Exception as error:
-            print(f"No se pudo iniciar consumidor RabbitMQ de schedule: {error}")
             logger.warning("No se pudo iniciar consumidor RabbitMQ de schedule: %s", error)
             time.sleep(5)

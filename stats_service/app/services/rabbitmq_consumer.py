@@ -67,77 +67,77 @@ def procesar_tarea_completada(db, mensaje: dict):
     event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
 
     if evento_ya_procesado(db, event_id):
-        print("Evento Task.Completed ya procesado")
+        logger.debug("Evento Task.Completed ya procesado")
         return
 
     registrar_tarea_completada(db, id_usuario)
     guardar_evento_procesado(db, event_id, event_type or TASK_COMPLETED)
     db.commit()
-    print("Evento Task.Completed recibido en stats")
+    logger.info("Evento Task.Completed recibido en stats")
 
 
 def procesar_tarea_creada(db, mensaje: dict):
     event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
 
     if evento_ya_procesado(db, event_id):
-        print("Evento Task.Created ya procesado")
+        logger.debug("Evento Task.Created ya procesado")
         return
 
     registrar_tarea_creada(db, id_usuario)
     guardar_evento_procesado(db, event_id, event_type or TASK_CREATED)
     db.commit()
-    print("Evento Task.Created recibido en stats")
+    logger.info("Evento Task.Created recibido en stats")
 
 
 def procesar_tarea_abandonada(db, mensaje: dict):
     event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
 
     if evento_ya_procesado(db, event_id):
-        print("Evento Task.Ditch ya procesado")
+        logger.debug("Evento Task.Ditch ya procesado")
         return
 
     registrar_tarea_abandonada(db, id_usuario)
     guardar_evento_procesado(db, event_id, event_type or TASK_DITCH)
     db.commit()
-    print("Evento Task.Ditch recibido en stats")
+    logger.info("Evento Task.Ditch recibido en stats")
 
 
 def procesar_bloque_completado(db, mensaje: dict):
     event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
 
     if evento_ya_procesado(db, event_id):
-        print("Evento bloque.completado ya procesado")
+        logger.debug("Evento bloque.completado ya procesado")
         return
 
     registrar_bloque_completado(db, id_usuario)
     guardar_evento_procesado(db, event_id, event_type or BLOQUE_COMPLETADO)
     db.commit()
-    print("Evento bloque.completado recibido en stats")
+    logger.info("Evento bloque.completado recibido en stats")
 
 
 def procesar_horario_creado(db, mensaje: dict):
     event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
 
     if evento_ya_procesado(db, event_id):
-        print("Evento Schedule.Created ya procesado")
+        logger.debug("Evento Schedule.Created ya procesado")
         return
 
     registrar_horario_creado(db, id_usuario)
     guardar_evento_procesado(db, event_id, event_type or SCHEDULE_CREATED)
     db.commit()
-    print("Evento Schedule.Created recibido en stats")
+    logger.info("Evento Schedule.Created recibido en stats")
 
 
 def procesar_horario_actualizado(db, mensaje: dict):
     event_id, event_type, _ = datos_basicos_evento(mensaje)
 
     if evento_ya_procesado(db, event_id):
-        print("Evento Schedule.Updated ya procesado")
+        logger.debug("Evento Schedule.Updated ya procesado")
         return
 
     guardar_evento_procesado(db, event_id, event_type or SCHEDULE_UPDATED)
     db.commit()
-    print("Evento Schedule.Updated registrado sin cambio de métricas")
+    logger.info("Evento Schedule.Updated registrado sin cambio de métricas")
 
 
 def procesar_evento(mensaje: dict):
@@ -171,10 +171,9 @@ def manejar_mensaje(ch, method, properties, body):
         procesar_evento(mensaje)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except (json.JSONDecodeError, ValueError) as error:
-        print(f"Evento mal formado: {error}")
+        logger.warning("Evento mal formado: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
-        print(f"No se pudo procesar evento RabbitMQ: {error}")
         logger.warning("No se pudo procesar evento RabbitMQ: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
@@ -204,9 +203,8 @@ def iniciar_consumidor():
                 on_message_callback=manejar_mensaje,
             )
 
-            print("Consumidor RabbitMQ de stats iniciado")
+            logger.info("Consumidor RabbitMQ de stats iniciado")
             canal.start_consuming()
         except Exception as error:
-            print(f"No se pudo iniciar consumidor RabbitMQ: {error}")
             logger.warning("No se pudo iniciar consumidor RabbitMQ: %s", error)
             time.sleep(5)

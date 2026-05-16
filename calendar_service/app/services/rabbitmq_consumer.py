@@ -131,10 +131,9 @@ def manejar_mensaje(ch, method, properties, body):
         asyncio.run(_sync_google_event(mensaje))
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except (json.JSONDecodeError, ValueError) as error:
-        print(f"Evento mal formado en calendar: {error}")
+        logger.warning("Evento mal formado en calendar: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
-        print(f"No se pudo procesar evento RabbitMQ en calendar: {error}")
         logger.warning("No se pudo procesar evento RabbitMQ en calendar: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
@@ -154,9 +153,8 @@ def iniciar_consumidor() -> None:
             canal.basic_qos(prefetch_count=1)
             canal.basic_consume(queue=QUEUE, on_message_callback=manejar_mensaje)
 
-            print("Consumidor RabbitMQ de calendar iniciado")
+            logger.info("Consumidor RabbitMQ de calendar iniciado")
             canal.start_consuming()
         except Exception as error:
-            print(f"No se pudo iniciar consumidor RabbitMQ de calendar: {error}")
             logger.warning("No se pudo iniciar consumidor RabbitMQ de calendar: %s", error)
             time.sleep(5)

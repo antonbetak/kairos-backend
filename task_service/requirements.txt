@@ -3,5 +3,6 @@ httpx
 pika
 psycopg2-binary
 pydantic-settings
+redis>=5.0,<6.0
 sqlalchemy
 uvicorn[standard]

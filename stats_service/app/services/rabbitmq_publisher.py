@@ -52,10 +52,9 @@ def publicar_evento_notificacion(
             ),
         )
         conexion.close()
-        print(f"Evento {routing_key} publicado")
+        logger.info("Evento %s publicado", routing_key)
         return True
     except Exception as error:
-        print(f"No se pudo publicar {routing_key}: {error}")
         logger.warning("No se pudo publicar %s: %s", routing_key, error)
         return False
 

@@ -18,6 +18,7 @@ def publicar_evento_schedule(
     routing_key: str,
     id_usuario: str,
     id_bloque: str | None = None,
+    request_id: str | None = None,
     titulo: str | None = None,
     descripcion: str | None = None,
     tipo: str | None = None,
@@ -39,6 +40,8 @@ def publicar_evento_schedule(
     }
     if id_bloque:
         payload["id_bloque"] = id_bloque
+    if request_id:
+        payload["request_id"] = request_id
     if titulo:
         payload["titulo"] = titulo
     if descripcion:
@@ -84,11 +87,9 @@ def publicar_evento_schedule(
             ),
         )
         conexion.close()
-        print(f"Evento {routing_key} publicado")
         logger.info("Evento %s publicado", routing_key)
         return True
     except Exception as error:
-        print(f"No se pudo publicar {routing_key}: {error}")
         logger.warning("No se pudo publicar %s: %s", routing_key, error)
         return False
 
@@ -96,6 +97,7 @@ def publicar_evento_schedule(
 def publicar_horario_creado(
     id_usuario: str,
     id_bloque: str,
+    request_id: str,
     titulo: str,
     descripcion: str | None,
     fecha_inicio: str,
@@ -109,6 +111,7 @@ def publicar_horario_creado(
         "Schedule.Created",
         id_usuario,
         id_bloque,
+        request_id,
         titulo,
         descripcion,
         tipo,
@@ -123,6 +126,7 @@ def publicar_horario_creado(
 def publicar_horario_actualizado(
     id_usuario: str,
     id_bloque: str,
+    request_id: str,
     titulo: str,
     descripcion: str | None,
     fecha_inicio: str,
@@ -134,6 +138,7 @@ def publicar_horario_actualizado(
         "Schedule.Updated",
         id_usuario,
         id_bloque,
+        request_id,
         titulo,
         descripcion,
         tipo,

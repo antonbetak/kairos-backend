@@ -9,6 +9,9 @@ import pika
 from app.db import SessionLocal
 from app.models import EventoProcesado
 from app.models import NotificacionUsuario
+from app.services.idempotency import complete as complete_idempotency
+from app.services.idempotency import fail as fail_idempotency
+from app.services.idempotency import reserve as reserve_idempotency
 
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
@@ -66,9 +69,17 @@ def crear_notificacion_desde_evento(mensaje: dict):
     if not event_id or not event_type or not id_usuario:
         raise ValueError("Evento incompleto")
 
+    reservation = reserve_idempotency("notifications", event_id)
+    if reservation.state == "COMPLETED":
+        return
+
+    if reservation.state == "PROCESSING" and not reservation.acquired:
+        return
+
     titulo_default, mensaje_default, tipo_default = texto_por_defecto(event_type)
 
     notificacion = NotificacionUsuario(
+        request_id=UUID(str(mensaje.get("request_id"))) if mensaje.get("request_id") else None,
         id_usuario=UUID(str(id_usuario)),
         titulo=mensaje.get("titulo") or titulo_default,
         mensaje=mensaje.get("mensaje") or mensaje.get("descripcion") or mensaje_default,
@@ -83,7 +94,18 @@ def crear_notificacion_desde_evento(mensaje: dict):
             .first()
         )
         if evento_procesado:
-            print(f"Evento {event_type} ya procesado en notifications")
+            complete_idempotency("notifications", event_id, {"event_type": event_type})
+            return
+
+        notificacion_existente = (
+            db.query(NotificacionUsuario)
+            .filter(NotificacionUsuario.request_id == notificacion.request_id)
+            .first()
+            if notificacion.request_id is not None
+            else None
+        )
+        if notificacion_existente:
+            complete_idempotency("notifications", event_id, {"event_type": event_type})
             return
 
         db.add(notificacion)
@@ -94,9 +116,10 @@ def crear_notificacion_desde_evento(mensaje: dict):
             )
         )
         db.commit()
-        print(f"Notificación guardada por evento {event_type}")
+        complete_idempotency("notifications", event_id, {"event_type": event_type})
     except Exception:
         db.rollback()
+        fail_idempotency("notifications", event_id)
         raise
     finally:
         db.close()
@@ -108,10 +131,9 @@ def manejar_mensaje(ch, method, properties, body):
         crear_notificacion_desde_evento(mensaje)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except (json.JSONDecodeError, ValueError) as error:
-        print(f"Evento de notificación mal formado: {error}")
+        logger.warning("Evento de notificación mal formado: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
-        print(f"No se pudo procesar evento de notificación: {error}")
         logger.warning("No se pudo procesar evento de notificación: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
@@ -143,9 +165,8 @@ def iniciar_consumidor():
                 on_message_callback=manejar_mensaje,
             )
 
-            print("Consumidor RabbitMQ de notifications iniciado")
+            logger.info("Consumidor RabbitMQ de notifications iniciado")
             canal.start_consuming()
         except Exception as error:
-            print(f"No se pudo iniciar consumidor RabbitMQ de notifications: {error}")
             logger.warning("No se pudo iniciar consumidor RabbitMQ de notifications: %s", error)
             time.sleep(5)

@@ -1,3 +1,7 @@
+import json
+import logging
+from datetime import datetime
+from datetime import timezone
 from uuid import UUID
 from threading import Thread
 
@@ -24,6 +28,31 @@ from app.services.rabbitmq_consumer import iniciar_consumidor
 from app.config import settings
 
 app = FastAPI(title="Kairos Notifications Service")
+logger = logging.getLogger(__name__)
+
+
+def _ensure_request_id_column() -> None:
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS notificaciones_usuario ADD COLUMN IF NOT EXISTS request_id UUID"
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_notificaciones_usuario_request_id ON notificaciones_usuario (request_id)"
+        )
+
+
+def _log_event(event_type: str, status: str, message: str, **fields):
+    payload = {
+        "request_id": fields.pop("request_id", None),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "notifications_service",
+        "event_type": event_type,
+        "status": status,
+        "message": message,
+        "error": fields.pop("error", None),
+        **fields,
+    }
+    logger.info(json.dumps(payload, default=str))
 
 
 def get_db():
@@ -73,6 +102,7 @@ async def obtener_id_usuario(authorization: str | None = Header(default=None)):
 @app.on_event("startup")
 def iniciar_base_de_datos():
     Base.metadata.create_all(bind=engine)
+    _ensure_request_id_column()
     Thread(target=iniciar_consumidor, daemon=True).start()
 
 
@@ -95,7 +125,17 @@ def crear_nueva_notificacion(
     id_usuario: UUID = Depends(obtener_id_usuario),
     db: Session = Depends(get_db),
 ):
-    return crear_notificacion(db, id_usuario, datos)
+    notificacion = crear_notificacion(db, id_usuario, datos, datos.request_id)
+    _log_event(
+        "NOTIFICATION_CREATED",
+        "SUCCESS",
+        "Notificación creada correctamente",
+        request_id=str(datos.request_id or notificacion.id_notificacion),
+        user_id=str(id_usuario),
+        notification_id=str(notificacion.id_notificacion),
+        trigger_event="manual",
+    )
+    return notificacion
 
 
 @app.post("/notificaciones/interna", response_model=NotificacionRespuesta)
@@ -107,7 +147,17 @@ def crear_notificacion_interna(
     if datos.id_usuario != id_usuario:
         raise HTTPException(status_code=403, detail="No puedes crear notificaciones para otro usuario")
 
-    return crear_notificacion(db, datos.id_usuario, datos)
+    notificacion = crear_notificacion(db, datos.id_usuario, datos, datos.request_id)
+    _log_event(
+        "NOTIFICATION_CREATED",
+        "SUCCESS",
+        "Notificación interna creada correctamente",
+        request_id=str(datos.request_id or notificacion.id_notificacion),
+        user_id=str(id_usuario),
+        notification_id=str(notificacion.id_notificacion),
+        trigger_event="internal",
+    )
+    return notificacion
 
 
 @app.patch("/notificaciones/{notificacion_id}/leer", response_model=NotificacionRespuesta)

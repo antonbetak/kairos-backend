@@ -303,10 +303,15 @@ services:
       SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT:-5432}
       SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       schedule_postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - kairos-network
@@ -330,12 +335,17 @@ services:
       TASK_DB_PORT: ${TASK_DB_PORT:-5432}
       TASK_DB_NAME: ${TASK_DB_NAME:-kairos_task_db}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     ports:
       - "8002:8000"
     depends_on:
       task_postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - kairos-network
@@ -357,10 +367,15 @@ services:
       NOTIFICATIONS_DB_PORT: ${NOTIFICATIONS_DB_PORT:-5432}
       NOTIFICATIONS_DB_NAME: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       notifications_postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8006:8000"

@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     notifications_db_port: int
     notifications_db_name: str
     auth_service_url: str = "http://auth_service:8000"
+    redis_host: str = "redis"
+    redis_port: int = 6379
+    redis_db: int = 0
+    redis_password: str | None = None
 
     @property
     def database_url(self) -> str:
