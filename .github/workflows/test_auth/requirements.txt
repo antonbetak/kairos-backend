@@ -1,0 +1,1 @@
+-r ../../../auth_service/requirements.txt
