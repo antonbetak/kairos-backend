@@ -1,5 +1,5 @@
 import unittest
-from uuid import UUID, uuid4
+from uuid import uuid4
 from types import SimpleNamespace
 from unittest.mock import patch
 

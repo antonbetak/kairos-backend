@@ -1,1 +1,1 @@
-../..//schedule_service/requirements.txt
+-r ../../../schedule_service/requirements.txt

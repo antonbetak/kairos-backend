@@ -1,1 +1,1 @@
-../..//stats_service/requirements.txt
+-r ../../../stats_service/requirements.txt

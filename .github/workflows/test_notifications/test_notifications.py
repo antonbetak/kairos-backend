@@ -51,7 +51,7 @@ class NotificationsTests(unittest.TestCase):
 
         db = DummyDB([n1, n2])
 
-        result = marcar_todas_como_leidas(db, "user-id")
+        marcar_todas_como_leidas(db, "user-id")
         self.assertTrue(all(n.leida for n in db._data))
 
 

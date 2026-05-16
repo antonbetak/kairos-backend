@@ -1,1 +1,1 @@
-../..//notifications_service/requirements.txt
+-r ../../../notifications_service/requirements.txt
