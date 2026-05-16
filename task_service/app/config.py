@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     task_db_user: str
     task_db_password: str
     task_db_name: str
+    auth_service_url: str = "http://auth_service:8000"
 
     @property
     def database_url(self) -> str:

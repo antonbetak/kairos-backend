@@ -34,6 +34,30 @@ class GoogleOAuthService:
         self.settings = settings
         self._state_secret = settings.google_client_secret.encode("utf-8")
 
+    async def _token_status(self, token: str) -> bool:
+        url = f"{self.settings.auth_service_url.rstrip('/')}/auth/token-status"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(url, json={"token": token})
+
+        if response.status_code >= 400:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No fue posible validar el estado del token.",
+            )
+
+        return bool(response.json().get("blacklisted"))
+
+    async def _blacklist_token(self, token: str) -> None:
+        url = f"{self.settings.auth_service_url.rstrip('/')}/auth/token-blacklist"
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(url, json={"token": token})
+
+        if response.status_code >= 400:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="No fue posible invalidar el token anterior.",
+            )
+
     def build_authorization_url(self) -> str:
         state = self._create_state()
         query = {
@@ -71,6 +95,12 @@ class GoogleOAuthService:
         return response.json()
 
     async def refresh_tokens(self, refresh_token: str) -> GoogleTokenSet:
+        if await self._token_status(refresh_token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="El refresh token de Google fue invalidado.",
+            )
+
         payload = {
             "refresh_token": refresh_token,
             "client_id": self.settings.google_client_id,
@@ -134,6 +164,12 @@ class GoogleOAuthService:
         return claims
 
     async def get_current_user(self, token: str) -> GoogleUserProfile:
+        if await self._token_status(token):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="El token de Google fue invalidado.",
+            )
+
         try:
             claims = self.verify_id_token(token)
             return self._build_user_profile(claims)
@@ -197,6 +233,9 @@ class GoogleOAuthService:
         )
 
         return GoogleAuthResponse(user=user, tokens=tokens)
+
+    async def blacklist_access_token(self, token: str) -> None:
+        await self._blacklist_token(token)
 
     def _build_user_profile(self, data: dict[str, object]) -> GoogleUserProfile:
         email = str(data.get("email") or "").strip()

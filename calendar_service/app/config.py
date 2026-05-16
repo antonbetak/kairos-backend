@@ -57,6 +57,14 @@ class Settings(BaseSettings):
 		...,
 		validation_alias=AliasChoices("GOOGLE_CLIENT_SECRET", "google_client_secret"),
 	)
+	auth_service_url: str = Field(
+		default="http://auth_service:8000",
+		validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
+	)
+	google_tokeninfo_uri: str = Field(
+		default="https://oauth2.googleapis.com/tokeninfo",
+		validation_alias=AliasChoices("GOOGLE_TOKENINFO_URI", "google_tokeninfo_uri"),
+	)
 	google_token_uri: str = Field(
 		default="https://oauth2.googleapis.com/token",
 		validation_alias=AliasChoices("GOOGLE_TOKEN_URI", "google_token_uri"),

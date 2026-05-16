@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     schedule_db_host: str
     schedule_db_port: int
     schedule_db_name: str
+    auth_service_url: str = "http://auth_service:8000"
 
     @property
     def database_url(self) -> str:

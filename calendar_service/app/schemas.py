@@ -31,6 +31,7 @@ class GoogleTokenSet(BaseSchema):
 
 class GoogleRefreshRequest(BaseModel):
 	refresh_token: str
+	access_token: str | None = None
 
 
 class GoogleRefreshResponse(BaseModel):

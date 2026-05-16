@@ -48,6 +48,8 @@ async def refresh_google_token(
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> GoogleRefreshResponse:
     tokens = await oauth_service.refresh_tokens(refresh_token=payload.refresh_token)
+    if payload.access_token:
+        await oauth_service.blacklist_access_token(payload.access_token)
     return GoogleRefreshResponse(tokens=tokens)
 
 

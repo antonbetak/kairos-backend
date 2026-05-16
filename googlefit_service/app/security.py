@@ -23,6 +23,47 @@ class FitAuthContext(BaseModel):
     refreshed: bool = False
 
 
+async def _token_status(token: str) -> bool:
+    url = f"{settings.auth_service_url.rstrip('/')}/auth/token-status"
+    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        response = await client.post(url, json={"token": token})
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No fue posible validar el estado del token.",
+        )
+
+    return bool(response.json().get("blacklisted"))
+
+
+async def _blacklist_token(token: str) -> None:
+    url = f"{settings.auth_service_url.rstrip('/')}/auth/token-blacklist"
+    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        response = await client.post(url, json={"token": token})
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No fue posible invalidar el token anterior.",
+        )
+
+
+def _select_google_token(authorization: str | None, google_token: str | None) -> str:
+    if google_token and str(google_token).strip():
+        return str(google_token).strip()
+
+    if authorization:
+        parts = authorization.strip().split()
+        if len(parts) == 2 and parts[0].lower() == "bearer" and parts[1].strip():
+            return parts[1].strip()
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Se requiere Authorization o X-Google-Token.",
+    )
+
+
 async def _tokeninfo(access_token: str) -> dict[str, Any]:
     params = {"access_token": access_token}
     async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
@@ -81,17 +122,25 @@ def _validate_scopes(token_scopes: str) -> list[str]:
 
 
 async def require_google_token(
-    google_token: str = Header(..., alias="X-Google-Token", description="Google access_token"),
+    authorization: str | None = Header(None, description="Bearer Google access_token"),
+    google_token: str | None = Header(None, alias="X-Google-Token", description="Google access_token"),
     google_refresh: str | None = Header(None, alias="X-Google-Refresh"),
 ) -> FitAuthContext:
-    access_token = google_token.strip()
+    access_token = _select_google_token(authorization, google_token)
     refreshed = False
+
+    if await _token_status(access_token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de Google invalidado.",
+        )
 
     try:
         token_info = await _tokeninfo(access_token)
     except HTTPException:
         if not google_refresh:
             raise
+        await _blacklist_token(access_token)
         access_token = await _refresh_access_token(google_refresh)
         token_info = await _tokeninfo(access_token)
         refreshed = True

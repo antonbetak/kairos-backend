@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import time
 from uuid import UUID
 
 import pika
@@ -208,3 +209,4 @@ def iniciar_consumidor():
         except Exception as error:
             print(f"No se pudo iniciar consumidor RabbitMQ: {error}")
             logger.warning("No se pudo iniciar consumidor RabbitMQ: %s", error)
+            time.sleep(5)

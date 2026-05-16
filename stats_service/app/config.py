@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     stats_db_host: str
     stats_db_port: int
     stats_db_name: str
+    auth_service_url: str = "http://auth_service:8000"
 
     @property
     def database_url(self) -> str:

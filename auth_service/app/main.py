@@ -21,13 +21,18 @@ from app.schemas import UserCreate
 from app.schemas import UserLogin
 from app.schemas import UserResponse
 from app.schemas import RefreshTokenRequest
+from app.schemas import TokenStatusRequest
+from app.schemas import TokenStatusResponse
+from app.schemas import TokenBlacklistRequest
 from app.schemas import VerifyTokenResponse
 from app.security import create_access_token
+from app.security import create_token_session_id
 from app.security import create_refresh_token
 from app.security import decode_access_token
 from app.security import decode_refresh_token
 from app.security import get_token_expiration
 from app.token_blacklist import blacklist_token
+from app.token_blacklist import blacklist_session
 from app.token_blacklist import is_token_blacklisted
 
 app = FastAPI(title="Kairos Auth Service")
@@ -105,14 +110,18 @@ def login_user(login_data: UserLogin, db: Session = Depends(get_db)):
     if not user or not pwd_context.verify(login_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    session_id = create_token_session_id()
+
     access_token, expires_in = create_access_token(
         user_id=user.id_usuario,
         email=user.email,
+        session_id=session_id,
     )
 
     refresh_token, refresh_expires_in = create_refresh_token(
         user_id=user.id_usuario,
         email=user.email,
+        session_id=session_id,
     )
 
     return TokenResponse(
@@ -156,15 +165,22 @@ def refresh_token(payload: RefreshTokenRequest, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
+    session_id = str(claims.get("sid") or "").strip()
+    if session_id:
+        blacklist_session(session_id, get_token_expiration(refresh_token_value))
+
     blacklist_token(refresh_token_value, get_token_expiration(refresh_token_value))
 
+    new_session_id = create_token_session_id()
     new_access_token, access_expires_in = create_access_token(
         user_id=user.id_usuario,
         email=user.email,
+        session_id=new_session_id,
     )
     new_refresh_token, refresh_expires_in = create_refresh_token(
         user_id=user.id_usuario,
         email=user.email,
+        session_id=new_session_id,
     )
 
     return TokenResponse(
@@ -235,3 +251,22 @@ def verify_token(authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=401, detail="token invalido")
 
     return VerifyTokenResponse(valid=True, id_usuario=user_id, email=email)
+
+
+@app.post("/auth/token-status", response_model=TokenStatusResponse)
+def token_status(payload: TokenStatusRequest):
+    token = payload.token.strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+
+    return TokenStatusResponse(blacklisted=is_token_blacklisted(token))
+
+
+@app.post("/auth/token-blacklist", response_model=TokenStatusResponse)
+def token_blacklist(payload: TokenBlacklistRequest):
+    token = payload.token.strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+
+    blacklist_token(token, get_token_expiration(token))
+    return TokenStatusResponse(blacklisted=True)

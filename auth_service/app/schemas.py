@@ -49,6 +49,18 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class TokenStatusRequest(BaseModel):
+    token: str
+
+
+class TokenStatusResponse(BaseModel):
+    blacklisted: bool
+
+
+class TokenBlacklistRequest(BaseModel):
+    token: str
+
+
 class VerifyTokenResponse(BaseModel):
     valid: bool
     id_usuario: UUID

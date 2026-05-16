@@ -1,6 +1,7 @@
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+import secrets
 from uuid import UUID
 
 from jose import JWTError
@@ -9,7 +10,11 @@ from jose import jwt
 from app.config import settings
 
 
-def create_access_token(user_id: UUID, email: str) -> tuple[str, int]:
+def create_token_session_id() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def create_access_token(user_id: UUID, email: str, session_id: str) -> tuple[str, int]:
     expires_delta = timedelta(minutes=settings.jwt_expire_minutes)
     expires_at = datetime.now(timezone.utc) + expires_delta
 
@@ -18,13 +23,15 @@ def create_access_token(user_id: UUID, email: str) -> tuple[str, int]:
         "email": email,
         "exp": expires_at,
         "type": "access",
+        "sid": session_id,
+        "jti": secrets.token_urlsafe(24),
     }
 
     token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
     return token, int(expires_delta.total_seconds())
 
 
-def create_refresh_token(user_id: UUID, email: str) -> tuple[str, int]:
+def create_refresh_token(user_id: UUID, email: str, session_id: str) -> tuple[str, int]:
     expires_delta = timedelta(minutes=settings.jwt_refresh_expire_minutes)
     expires_at = datetime.now(timezone.utc) + expires_delta
 
@@ -33,6 +40,8 @@ def create_refresh_token(user_id: UUID, email: str) -> tuple[str, int]:
         "email": email,
         "exp": expires_at,
         "type": "refresh",
+        "sid": session_id,
+        "jti": secrets.token_urlsafe(24),
     }
 
     token = jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
