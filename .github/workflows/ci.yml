@@ -1,0 +1,124 @@
+name: auth-ci
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  auth-service-tests:
+    runs-on: ubuntu-latest
+    environment: workflows
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install auth test dependencies
+        run: pip install -r .github/workflows/test_auth/requirements.txt
+
+      - name: Create .env for auth service tests
+        run: |
+          cat > .env << 'EOF'
+          ENV_FILE=.env
+          AUTH_DB_USER=kairos_auth_user
+          AUTH_DB_PASSWORD=kairos_auth_password
+          AUTH_DB_NAME=kairos_auth_db
+          AUTH_DB_PORT=5432
+          JWT_SECRET=ci-jwt-secret
+          JWT_ALGORITHM=HS256
+          JWT_EXPIRE_MINUTES=60
+          JWT_REFRESH_EXPIRE_MINUTES=10080
+          REDIS_HOST=redis
+          REDIS_PORT=6379
+          REDIS_DB=0
+          EOF
+
+      - name: Start auth stack
+        run: docker compose -f docker-compose.yml --env-file .env up --build -d auth_postgres redis auth_service
+
+      - name: Wait for auth-service
+        run: |
+          timeout 180 bash -c '
+            until curl -fsS http://localhost:8001/health > /dev/null; do
+              echo "Esperando auth-service en puerto 8001..."
+              sleep 5
+            done
+          '
+
+      - name: Run auth tests
+        env:
+          AUTH_TEST_BASE_URL: http://localhost:8001
+          RUN_E2E_TESTS: "1"
+        run: python -m unittest discover -s .github/workflows/test_auth -p "test_auth.py" -v
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml --env-file .env logs --tail=200 auth_service auth_postgres redis
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.yml --env-file .env down -v --remove-orphans
+
+  google-auth-tests:
+    runs-on: ubuntu-latest
+    environment: workflows
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install google auth test dependencies
+        run: pip install -r .github/workflows/test_google_auth/requirements.txt
+
+      - name: Create .env for google auth tests
+        run: |
+          cat > .env << 'EOF'
+          ENV_FILE=.env
+          APP_NAME=google_auth_service
+          APP_ENV=development
+          APP_PORT=8000
+          GOOGLE_CLIENT_ID=ci-google-client-id
+          GOOGLE_CLIENT_SECRET=ci-google-client-secret
+          GOOGLE_REDIRECT_URI=http://localhost:8007/auth/google/callback
+          AUTH_SERVICE_URL=http://auth_service:8000
+          EOF
+
+      - name: Start google-auth
+        run: docker compose -f docker-compose.yml --env-file .env up --build -d google_auth
+
+      - name: Wait for google-auth
+        run: |
+          timeout 180 bash -c '
+            until curl -fsS http://localhost:8007/health > /dev/null; do
+              echo "Esperando google_auth en puerto 8007..."
+              sleep 5
+            done
+          '
+
+      - name: Run google auth tests
+        env:
+          GOOGLE_AUTH_TEST_BASE_URL: http://localhost:8007
+          RUN_E2E_TESTS: "1"
+        run: python -m unittest discover -s .github/workflows/test_google_auth -p "test_google_auth.py" -v
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml --env-file .env logs --tail=200 google_auth
+
+      - name: Cleanup
+        if: always()
+        run: docker compose -f docker-compose.yml --env-file .env down -v --remove-orphans

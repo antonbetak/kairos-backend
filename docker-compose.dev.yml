@@ -1,0 +1,45 @@
+services:
+  api-gateway:
+    build:
+      context: ./api-gateway
+    env_file: .env.dev
+    ports:
+      - "${API_GATEWAY_PORT:-8000}:8000"
+    volumes:
+      - ./api-gateway:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure
+    depends_on:
+      google_auth:
+        condition: service_started
+      calendar-service:
+        condition: service_started
+      googlefit_service:
+        condition: service_started
+
+  google_auth:
+    env_file: .env.dev
+    expose:
+      - "8000"
+
+  calendar-service:
+    build:
+      context: ./calendar_service
+    env_file: .env.dev
+    expose:
+      - "8000"
+    volumes:
+      - ./calendar_service:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure
+
+  googlefit_service:
+    build:
+      context: ./googlefit_service
+    env_file: .env.dev
+    expose:
+      - "8000"
+    volumes:
+      - ./googlefit_service:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure

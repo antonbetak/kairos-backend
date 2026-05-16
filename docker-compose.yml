@@ -1,19 +1,165 @@
 services:
+  api-gateway:
+    build: ./api-gateway
+    env_file: ${ENV_FILE:-.env}
+    ports:
+      - "8000:8000"
+    restart: on-failure
+    depends_on:
+      auth_service:
+        condition: service_healthy
+      schedule_service:
+        condition: service_started
+      task_service:
+        condition: service_started
+      stats_service:
+        condition: service_started
+      notifications_service:
+        condition: service_started
+    networks:
+      - kairos-network
+
+  google_auth:
+    build: ./google_auth
+    env_file: .env
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_NAME: ${APP_NAME:-google_auth_service}
+      APP_PORT: ${APP_PORT:-8000}
+    restart: on-failure
+    ports:
+      - "8007:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kairos-network
+
+  calendar-service:
+    build: ./calendar_service
+    env_file: ${ENV_FILE:-.env}
+    restart: on-failure
+    ports:
+      - "8008:8000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kairos-network
+
+  googlefit_service:
+    build: ./googlefit_service
+    env_file: ${ENV_FILE:-.env}
+    restart: on-failure
+    ports:
+      - "8009:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - kairos-network
+
+  stt_service:
+    build: ./stt_service
+    env_file: ${ENV_FILE:-.env}
+    restart: on-failure
+    ports:
+      - "8010:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   postgres:
     image: postgres:16-alpine
     container_name: kairos-postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-kairos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kairos_password}
+      POSTGRES_DB: ${POSTGRES_DB:-kairos_db}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - kairos-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kairos_user} -d ${POSTGRES_DB:-kairos_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-auth-postgres
+    environment:
+      POSTGRES_USER: ${AUTH_DB_USER:-kairos_auth_user}
+      POSTGRES_PASSWORD: ${AUTH_DB_PASSWORD:-kairos_auth_password}
+      POSTGRES_DB: ${AUTH_DB_NAME:-kairos_auth_db}
+    ports:
+      - "5433:5432"
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTH_DB_USER:-kairos_auth_user} -d ${AUTH_DB_NAME:-kairos_auth_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  task_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-task-postgres
+    environment:
+      POSTGRES_USER: ${TASK_DB_USER:-kairos_task_user}
+      POSTGRES_PASSWORD: ${TASK_DB_PASSWORD:-kairos_task_password}
+      POSTGRES_DB: ${TASK_DB_NAME:-kairos_task_db}
+    ports:
+      - "5434:5432"
+    volumes:
+      - task_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TASK_DB_USER:-kairos_task_user} -d ${TASK_DB_NAME:-kairos_task_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  schedule_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-schedule-postgres
+    environment:
+      POSTGRES_USER: ${SCHEDULE_DB_USER:-kairos_schedule_user}
+      POSTGRES_PASSWORD: ${SCHEDULE_DB_PASSWORD:-kairos_schedule_password}
+      POSTGRES_DB: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
+    ports:
+      - "5435:5432"
+    volumes:
+      - schedule_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SCHEDULE_DB_USER:-kairos_schedule_user} -d ${SCHEDULE_DB_NAME:-kairos_schedule_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -49,12 +195,191 @@ services:
       timeout: 5s
       retries: 5
 
-  google_auth_service:
-    build:
-      context: ./google_auth
-    container_name: kairos-google-auth-service
+  stats_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-stats-postgres
+    environment:
+      POSTGRES_USER: ${STATS_DB_USER:-kairos_stats_user}
+      POSTGRES_PASSWORD: ${STATS_DB_PASSWORD:-kairos_stats_password}
+      POSTGRES_DB: ${STATS_DB_NAME:-kairos_stats_db}
     ports:
-      - "${GOOGLE_AUTH_SERVICE_PORT}:8000"
+      - "5436:5432"
+    volumes:
+      - stats_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STATS_DB_USER:-kairos_stats_user} -d ${STATS_DB_NAME:-kairos_stats_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth_service:
+    build:
+      context: ./auth_service
+    container_name: kairos-auth-service
+    environment:
+      AUTH_DB_HOST: auth_postgres
+      AUTH_DB_PORT: 5432
+      AUTH_DB_USER: ${AUTH_DB_USER:-kairos_auth_user}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-kairos_auth_password}
+      AUTH_DB_NAME: ${AUTH_DB_NAME:-kairos_auth_db}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      JWT_REFRESH_EXPIRE_MINUTES: ${JWT_REFRESH_EXPIRE_MINUTES:-10080}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
+    depends_on:
+      auth_postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kairos-network
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  stats_service:
+    build:
+      context: ./stats_service
+    container_name: kairos-stats-service
+    environment:
+      STATS_DB_USER: ${STATS_DB_USER:-kairos_stats_user}
+      STATS_DB_PASSWORD: ${STATS_DB_PASSWORD:-kairos_stats_password}
+      STATS_DB_HOST: stats_postgres
+      STATS_DB_PORT: ${STATS_DB_PORT:-5432}
+      STATS_DB_NAME: ${STATS_DB_NAME:-kairos_stats_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    depends_on:
+      stats_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8005:8000"
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notifications_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-notifications-postgres
+    environment:
+      POSTGRES_USER: ${NOTIFICATIONS_DB_USER:-kairos_notifications_user}
+      POSTGRES_PASSWORD: ${NOTIFICATIONS_DB_PASSWORD:-kairos_notifications_password}
+      POSTGRES_DB: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+    ports:
+      - "5437:5432"
+    volumes:
+      - notifications_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${NOTIFICATIONS_DB_USER:-kairos_notifications_user} -d ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  schedule_service:
+    build:
+      context: ./schedule_service
+    container_name: kairos-schedule-service
+    restart: unless-stopped
+    environment:
+      SCHEDULE_DB_USER: ${SCHEDULE_DB_USER:-kairos_schedule_user}
+      SCHEDULE_DB_PASSWORD: ${SCHEDULE_DB_PASSWORD:-kairos_schedule_password}
+      SCHEDULE_DB_HOST: schedule_postgres
+      SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT:-5432}
+      SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    depends_on:
+      schedule_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - kairos-network
+    ports:
+      - "8004:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  task_service:
+    build:
+      context: ./task_service
+    container_name: kairos-task-service
+    restart: unless-stopped
+    environment:
+      TASK_DB_USER: ${TASK_DB_USER:-kairos_task_user}
+      TASK_DB_PASSWORD: ${TASK_DB_PASSWORD:-kairos_task_password}
+      TASK_DB_HOST: task_postgres
+      TASK_DB_PORT: ${TASK_DB_PORT:-5432}
+      TASK_DB_NAME: ${TASK_DB_NAME:-kairos_task_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    ports:
+      - "8002:8000"
+    depends_on:
+      task_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notifications_service:
+    build:
+      context: ./notifications_service
+    container_name: kairos-notifications-service
+    restart: on-failure
+    environment:
+      NOTIFICATIONS_DB_USER: ${NOTIFICATIONS_DB_USER:-kairos_notifications_user}
+      NOTIFICATIONS_DB_PASSWORD: ${NOTIFICATIONS_DB_PASSWORD:-kairos_notifications_password}
+      NOTIFICATIONS_DB_HOST: notifications_postgres
+      NOTIFICATIONS_DB_PORT: ${NOTIFICATIONS_DB_PORT:-5432}
+      NOTIFICATIONS_DB_NAME: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    depends_on:
+      notifications_postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8006:8000"
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  agent_service:
+    build:
+      context: ./agent_service
+    container_name: kairos-agent-service
+    restart: on-failure
+    env_file: ${ENV_FILE:-.env}
+    ports:
+      - "8011:8000"
     networks:
       - kairos-network
     healthcheck:
@@ -65,6 +390,11 @@ services:
 
 volumes:
   postgres_data:
+  stats_postgres_data:
+  auth_postgres_data:
+  task_postgres_data:
+  schedule_postgres_data:
+  notifications_postgres_data:
   redis_data:
   rabbitmq_data:
 
