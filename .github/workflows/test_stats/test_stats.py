@@ -1,10 +1,33 @@
+import sys
 import unittest
 from uuid import uuid4
 from types import SimpleNamespace
+from pathlib import Path
+import os
+from types import ModuleType
 from unittest.mock import patch
 
 
-from stats_service.app.services.estadisticas import (
+REPO_ROOT = Path(__file__).resolve().parents[3]
+STATS_SERVICE_ROOT = REPO_ROOT / "stats_service"
+if str(STATS_SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(STATS_SERVICE_ROOT))
+
+os.environ.setdefault("stats_db_user", "kairos")
+os.environ.setdefault("stats_db_password", "kairos")
+os.environ.setdefault("stats_db_host", "localhost")
+os.environ.setdefault("stats_db_port", "5432")
+os.environ.setdefault("stats_db_name", "kairos")
+
+fake_pika = ModuleType("pika")
+fake_pika.URLParameters = object
+fake_pika.BlockingConnection = object
+fake_pika.BasicProperties = object
+fake_pika.DeliveryMode = type("DeliveryMode", (), {"Persistent": object()})
+sys.modules.setdefault("pika", fake_pika)
+
+
+from app.services.estadisticas import (
     enviar_notificacion,
     registrar_tarea_creada,
 )
@@ -15,13 +38,13 @@ class StatsServiceTests(unittest.TestCase):
         user = uuid4()
 
         with patch(
-            "stats_service.app.services.estadisticas.publicar_racha_actualizada",
+            "app.services.estadisticas.publicar_racha_actualizada",
             return_value=True,
         ) as racha_pub, patch(
-            "stats_service.app.services.estadisticas.publicar_notificacion_creada",
+            "app.services.estadisticas.publicar_notificacion_creada",
             return_value=True,
         ) as notif_pub, patch(
-            "stats_service.app.services.estadisticas.publicar_logro_desbloqueado",
+            "app.services.estadisticas.publicar_logro_desbloqueado",
             return_value=True,
         ) as logro_pub:
             self.assertTrue(
@@ -59,7 +82,7 @@ class StatsServiceTests(unittest.TestCase):
         db = DummyDB()
 
         with patch(
-            "stats_service.app.services.estadisticas.obtener_o_crear_estadistica_usuario",
+            "app.services.estadisticas.obtener_o_crear_estadistica_usuario",
             return_value=estadistica,
         ):
             result = registrar_tarea_creada(db, user)

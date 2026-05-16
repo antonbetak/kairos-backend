@@ -1,4 +1,5 @@
 from datetime import datetime
+from datetime import timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -32,7 +33,7 @@ def obtener_notificaciones_usuario(db: Session, id_usuario: UUID):
 
 def marcar_notificacion_leida(db: Session, notificacion: NotificacionUsuario):
     notificacion.leida = True
-    notificacion.fecha_lectura = datetime.utcnow()
+    notificacion.fecha_lectura = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(notificacion)
@@ -48,7 +49,7 @@ def marcar_todas_como_leidas(db: Session, id_usuario: UUID):
         .all()
     )
 
-    fecha_lectura = datetime.utcnow()
+    fecha_lectura = datetime.now(timezone.utc)
     for notificacion in notificaciones:
         notificacion.leida = True
         notificacion.fecha_lectura = fecha_lectura

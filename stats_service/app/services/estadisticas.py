@@ -1,5 +1,6 @@
 from datetime import date
 from datetime import datetime
+from datetime import timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -124,7 +125,7 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     racha = obtener_o_crear_racha_usuario(db, id_usuario, "tareas")
 
     estadistica.tareas_completadas += 1
-    estadistica.fecha_actualizacion = datetime.utcnow()
+    estadistica.fecha_actualizacion = datetime.now(timezone.utc)
 
     if estadistica.tareas_creadas > 0:
         estadistica.porcentaje_cumplimiento = (
@@ -189,7 +190,7 @@ def registrar_tarea_abandonada(db: Session, id_usuario: UUID):
     if racha.racha_actual > 0:
         racha.racha_actual -= 1
 
-    estadistica.fecha_actualizacion = datetime.utcnow()
+    estadistica.fecha_actualizacion = datetime.now(timezone.utc)
     racha.ultima_fecha_actividad = date.today()
 
     db.commit()
@@ -203,7 +204,7 @@ def registrar_tarea_creada(db: Session, id_usuario: UUID):
     estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
 
     estadistica.tareas_creadas += 1
-    estadistica.fecha_actualizacion = datetime.utcnow()
+    estadistica.fecha_actualizacion = datetime.now(timezone.utc)
 
     if estadistica.tareas_creadas > 0:
         estadistica.porcentaje_cumplimiento = (
@@ -220,7 +221,7 @@ def registrar_horario_creado(db: Session, id_usuario: UUID):
     estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
 
     estadistica.horarios_creados += 1
-    estadistica.fecha_actualizacion = datetime.utcnow()
+    estadistica.fecha_actualizacion = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(estadistica)
@@ -232,7 +233,7 @@ def registrar_bloque_completado(db: Session, id_usuario: UUID):
     estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
 
     estadistica.bloques_completados += 1
-    estadistica.fecha_actualizacion = datetime.utcnow()
+    estadistica.fecha_actualizacion = datetime.now(timezone.utc)
 
     if estadistica.bloques_completados == 1:
         desbloquear_logro_si_no_existe(
