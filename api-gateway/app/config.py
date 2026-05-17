@@ -6,119 +6,121 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-	model_config = SettingsConfigDict(
-		env_file=".env",
-		env_file_encoding="utf-8",
-		extra="ignore",
-		populate_by_name=True,
-		case_sensitive=False,
-	)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+        case_sensitive=False,
+    )
 
-	app_name: str = Field(
-		default="api_gateway",
-		validation_alias=AliasChoices("APP_NAME", "app_name"),
-	)
-	app_env: str = Field(
-		default="development",
-		validation_alias=AliasChoices("APP_ENV", "app_env"),
-	)
-	log_level: str = Field(
-		default="INFO",
-		validation_alias=AliasChoices("APP_LOG_LEVEL", "log_level"),
-	)
-	host: str = Field(
-		default="0.0.0.0",
-		validation_alias=AliasChoices("APP_HOST", "host"),
-	)
-	port: int = Field(
-		default=8000,
-		validation_alias=AliasChoices("APP_PORT", "port"),
-	)
+    app_name: str = Field(
+        default="api_gateway",
+        validation_alias=AliasChoices("APP_NAME", "app_name"),
+    )
+    app_env: str = Field(
+        default="development",
+        validation_alias=AliasChoices("APP_ENV", "app_env"),
+    )
+    log_level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices("APP_LOG_LEVEL", "log_level"),
+    )
+    host: str = Field(
+        default="0.0.0.0",
+        validation_alias=AliasChoices("APP_HOST", "host"),
+    )
+    port: int = Field(
+        default=8000,
+        validation_alias=AliasChoices("APP_PORT", "port"),
+    )
 
-	cors_origins: str = Field(
-		default="",
-		validation_alias=AliasChoices("CORS_ORIGINS", "cors_origins"),
-	)
+    cors_origins: str = Field(
+        default="",
+        validation_alias=AliasChoices("CORS_ORIGINS", "cors_origins"),
+    )
 
-	google_auth_url: str = Field(
-		default="http://google_auth:8000",
-		validation_alias=AliasChoices("GOOGLE_AUTH_URL", "google_auth_url"),
-	)
-	calendar_service_url: str = Field(
-		default="http://calendar-service:8000",
-		validation_alias=AliasChoices("CALENDAR_SERVICE_URL", "calendar_service_url"),
-	)
-	google_fit_url: str = Field(
-		default="http://googlefit_service:8000",
-		validation_alias=AliasChoices("GOOGLE_FIT_URL", "google_fit_url"),
-	)
-	stt_service_url: str = Field(
-		default="http://stt_service:8000",
-		validation_alias=AliasChoices("STT_SERVICE_URL", "stt_service_url"),
-	)
-	notifications_service_url: str = Field(
-		default="http://notifications_service:8000",
-		validation_alias=AliasChoices("NOTIFICATIONS_SERVICE_URL", "notifications_service_url"),
-	)
-	stats_service_url: str = Field(
-		default="http://stats_service:8000",
-		validation_alias=AliasChoices("STATS_SERVICE_URL", "stats_service_url"),
-	)
-	agent_service_url: str = Field(
-		default="http://agent_service:8000",
-		validation_alias=AliasChoices("AGENT_SERVICE_URL", "agent_service_url"),
-	)
-	auth_service_url: str = Field(
-		default="http://auth_service:8000",
-		validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
-	)
-	schedule_service_url: str = Field(
-		default="http://schedule_service:8000",
-		validation_alias=AliasChoices("SCHEDULE_SERVICE_URL", "schedule_service_url"),
-	)
-	task_service_url: str = Field(
-		default="http://task_service:8000",
-		validation_alias=AliasChoices("TASK_SERVICE_URL", "task_service_url"),
-	)
+    google_auth_url: str = Field(
+        default="http://google_auth:8000",
+        validation_alias=AliasChoices("GOOGLE_AUTH_URL", "google_auth_url"),
+    )
+    calendar_service_url: str = Field(
+        default="http://calendar-service:8000",
+        validation_alias=AliasChoices("CALENDAR_SERVICE_URL", "calendar_service_url"),
+    )
+    google_fit_url: str = Field(
+        default="http://googlefit_service:8000",
+        validation_alias=AliasChoices("GOOGLE_FIT_URL", "google_fit_url"),
+    )
+    stt_service_url: str = Field(
+        default="http://stt_service:8000",
+        validation_alias=AliasChoices("STT_SERVICE_URL", "stt_service_url"),
+    )
+    notifications_service_url: str = Field(
+        default="http://notifications_service:8000",
+        validation_alias=AliasChoices(
+            "NOTIFICATIONS_SERVICE_URL", "notifications_service_url"
+        ),
+    )
+    stats_service_url: str = Field(
+        default="http://stats_service:8000",
+        validation_alias=AliasChoices("STATS_SERVICE_URL", "stats_service_url"),
+    )
+    agent_service_url: str = Field(
+        default="http://agent_service:8000",
+        validation_alias=AliasChoices("AGENT_SERVICE_URL", "agent_service_url"),
+    )
+    auth_service_url: str = Field(
+        default="http://auth_service:8000",
+        validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
+    )
+    schedule_service_url: str = Field(
+        default="http://schedule_service:8000",
+        validation_alias=AliasChoices("SCHEDULE_SERVICE_URL", "schedule_service_url"),
+    )
+    task_service_url: str = Field(
+        default="http://task_service:8000",
+        validation_alias=AliasChoices("TASK_SERVICE_URL", "task_service_url"),
+    )
 
-	request_timeout_seconds: float = Field(
-		default=20.0,
-		validation_alias=AliasChoices("REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds"),
-	)
+    request_timeout_seconds: float = Field(
+        default=20.0,
+        validation_alias=AliasChoices(
+            "REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds"
+        ),
+    )
 
-	def cors_origins_list(self) -> list[str]:
-		default_origins = [
-			"http://localhost:3000",
-			"http://localhost:8081",
-			"http://localhost:19006",
-		]
+    def cors_origins_list(self) -> list[str]:
+        default_origins = [
+            "http://localhost:3000",
+            "http://localhost:8081",
+            "http://localhost:19006",
+        ]
 
-		value = self.cors_origins
-		if value is None:
-			return default_origins
+        value = self.cors_origins
+        if value is None:
+            return default_origins
 
-		value = str(value).strip()
-		if not value:
-			return default_origins
+        value = str(value).strip()
+        if not value:
+            return default_origins
 
-		if value.startswith("["):
-			try:
-				parsed = json.loads(value)
-			except json.JSONDecodeError:
-				parsed = None
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = None
 
-			if isinstance(parsed, list):
-				cleaned = [
-					str(origin).strip()
-					for origin in parsed
-					if str(origin).strip()
-				]
-				return cleaned or default_origins
+            if isinstance(parsed, list):
+                cleaned = [
+                    str(origin).strip() for origin in parsed if str(origin).strip()
+                ]
+                return cleaned or default_origins
 
-		parsed = [origin.strip() for origin in value.split(",") if origin.strip()]
-		return parsed or default_origins
+        parsed = [origin.strip() for origin in value.split(",") if origin.strip()]
+        return parsed or default_origins
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-	return Settings()
+    return Settings()

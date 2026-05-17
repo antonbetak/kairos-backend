@@ -53,7 +53,9 @@ def decode_access_token(token: str) -> dict:
 
 
 def decode_refresh_token(token: str) -> dict:
-    payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    payload = jwt.decode(
+        token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+    )
     if payload.get("type") not in (None, "refresh"):
         raise JWTError("Invalid refresh token type")
     return payload

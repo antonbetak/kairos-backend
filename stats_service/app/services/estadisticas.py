@@ -111,7 +111,9 @@ def desbloquear_logro_si_no_existe(
     return logro
 
 
-def enviar_notificacion(id_usuario: UUID, titulo: str, mensaje: str, tipo: str, routing_key: str):
+def enviar_notificacion(
+    id_usuario: UUID, titulo: str, mensaje: str, tipo: str, routing_key: str
+):
     if routing_key == "racha.actualizada":
         return publicar_racha_actualizada(id_usuario, titulo, mensaje)
     if routing_key == "notificacion.creada":

@@ -86,7 +86,9 @@ def obtener_id_usuario(authorization: str | None = Header(default=None)):
             timeout=20.0,
         )
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=503, detail="No fue posible validar la autorización") from exc
+        raise HTTPException(
+            status_code=503, detail="No fue posible validar la autorización"
+        ) from exc
 
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -111,7 +113,9 @@ def obtener_token_google(
                 timeout=20.0,
             )
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=503, detail="No fue posible validar el token de Google") from exc
+            raise HTTPException(
+                status_code=503, detail="No fue posible validar el token de Google"
+            ) from exc
 
         if response.status_code != 200 or response.json().get("blacklisted"):
             raise HTTPException(status_code=401, detail="Token de Google invalidado")
@@ -217,7 +221,9 @@ def crear_tarea(
             .first()
         )
         if existente:
-            complete_idempotency("tasks", request_id, {"id_tarea": str(existente.id_tarea)})
+            complete_idempotency(
+                "tasks", request_id, {"id_tarea": str(existente.id_tarea)}
+            )
             return existente
         fail_idempotency("tasks", request_id)
         raise

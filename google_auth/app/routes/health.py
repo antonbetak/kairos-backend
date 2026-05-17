@@ -10,4 +10,6 @@ router = APIRouter(tags=["Health"])
 @router.get("/health", response_model=HealthResponse, summary="Healthcheck")
 async def healthcheck() -> HealthResponse:
     settings = get_settings()
-    return HealthResponse(status="ok", service=settings.app_name, environment=settings.app_env)
+    return HealthResponse(
+        status="ok", service=settings.app_name, environment=settings.app_env
+    )

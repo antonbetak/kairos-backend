@@ -49,9 +49,17 @@ def texto_por_defecto(event_type: str):
     if event_type == "Schedule.Updated":
         return "Horario actualizado", "Tu horario fue actualizado", "recordatorio"
     if event_type == "Schedule.Error":
-        return "Error en horario", "Ocurrió un problema al procesar un horario", "alerta"
+        return (
+            "Error en horario",
+            "Ocurrió un problema al procesar un horario",
+            "alerta",
+        )
     if event_type == "Task.DueWarning":
-        return "Tarea próxima a vencer", "Tienes una tarea cercana a su vencimiento", "recordatorio"
+        return (
+            "Tarea próxima a vencer",
+            "Tienes una tarea cercana a su vencimiento",
+            "recordatorio",
+        )
     if event_type == "bloque.completado":
         return "Bloque completado", "Completaste un bloque de concentración", "progreso"
     if event_type == "logro.desbloqueado":
@@ -79,7 +87,9 @@ def crear_notificacion_desde_evento(mensaje: dict):
     titulo_default, mensaje_default, tipo_default = texto_por_defecto(event_type)
 
     notificacion = NotificacionUsuario(
-        request_id=UUID(str(mensaje.get("request_id"))) if mensaje.get("request_id") else None,
+        request_id=UUID(str(mensaje.get("request_id")))
+        if mensaje.get("request_id")
+        else None,
         id_usuario=UUID(str(id_usuario)),
         titulo=mensaje.get("titulo") or titulo_default,
         mensaje=mensaje.get("mensaje") or mensaje.get("descripcion") or mensaje_default,
@@ -168,5 +178,7 @@ def iniciar_consumidor():
             logger.info("Consumidor RabbitMQ de notifications iniciado")
             canal.start_consuming()
         except Exception as error:
-            logger.warning("No se pudo iniciar consumidor RabbitMQ de notifications: %s", error)
+            logger.warning(
+                "No se pudo iniciar consumidor RabbitMQ de notifications: %s", error
+            )
             time.sleep(5)

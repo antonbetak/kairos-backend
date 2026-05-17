@@ -10,7 +10,10 @@ from app.schemas import (
     DeviceEventsResponse,
 )
 from app.security import AuthContext, require_jwt
-from app.services.device_calendar import DeviceCalendarService, get_device_calendar_service
+from app.services.device_calendar import (
+    DeviceCalendarService,
+    get_device_calendar_service,
+)
 
 
 router = APIRouter(prefix="/device", tags=["Device Calendar"])
@@ -20,7 +23,11 @@ def get_device_service() -> DeviceCalendarService:
     return get_device_calendar_service()
 
 
-@router.get("/calendars", response_model=DeviceCalendarsResponse, summary="List device calendars")
+@router.get(
+    "/calendars",
+    response_model=DeviceCalendarsResponse,
+    summary="List device calendars",
+)
 async def list_device_calendars(
     auth: AuthContext = Depends(require_jwt),
     service: DeviceCalendarService = Depends(get_device_service),
@@ -29,7 +36,11 @@ async def list_device_calendars(
     return DeviceCalendarsResponse(items=calendars)
 
 
-@router.post("/calendars", response_model=DeviceCalendarsResponse, summary="Sync device calendars")
+@router.post(
+    "/calendars",
+    response_model=DeviceCalendarsResponse,
+    summary="Sync device calendars",
+)
 async def sync_device_calendars(
     payload: DeviceCalendarsSyncRequest,
     auth: AuthContext = Depends(require_jwt),
@@ -39,7 +50,9 @@ async def sync_device_calendars(
     return DeviceCalendarsResponse(items=calendars)
 
 
-@router.get("/events", response_model=DeviceEventsResponse, summary="List device events")
+@router.get(
+    "/events", response_model=DeviceEventsResponse, summary="List device events"
+)
 async def list_device_events(
     calendar_id: str | None = Query(None),
     time_min: str | None = Query(None, description="RFC3339 start time"),

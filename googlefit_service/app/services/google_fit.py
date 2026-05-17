@@ -37,7 +37,9 @@ class GoogleFitService:
         end_ms: int,
         bucket_days: int,
     ) -> dict[str, Any]:
-        metrics = await self.aggregate_metrics(access_token, start_ms, end_ms, bucket_days)
+        metrics = await self.aggregate_metrics(
+            access_token, start_ms, end_ms, bucket_days
+        )
         sessions = await self.list_sessions(access_token, start_ms, end_ms)
         data_sources = await self.list_data_sources(access_token)
 
@@ -84,7 +86,11 @@ class GoogleFitService:
             datasets = bucket.get("dataset", [])
 
             for index, dataset in enumerate(datasets):
-                data_type = data_types[index] if index < len(data_types) else dataset.get("dataSourceId")
+                data_type = (
+                    data_types[index]
+                    if index < len(data_types)
+                    else dataset.get("dataSourceId")
+                )
                 metric = metrics.get(data_type)
                 if metric is None:
                     continue
@@ -95,7 +101,9 @@ class GoogleFitService:
                     start_time_ms=start_time,
                     end_time_ms=end_time,
                     value=value,
-                    raw_points=points if data_type == "com.google.activity.segment" else None,
+                    raw_points=points
+                    if data_type == "com.google.activity.segment"
+                    else None,
                 )
                 metric.buckets.append(bucket_item)
                 if metric.total is None:
@@ -108,7 +116,9 @@ class GoogleFitService:
 
         return list(metrics.values())
 
-    async def list_sessions(self, access_token: str, start_ms: int, end_ms: int) -> list[dict[str, Any]]:
+    async def list_sessions(
+        self, access_token: str, start_ms: int, end_ms: int
+    ) -> list[dict[str, Any]]:
         url = f"{self.base_url}/sessions"
         params = {
             "startTime": self._ms_to_rfc3339(start_ms),
@@ -148,8 +158,12 @@ class GoogleFitService:
     ) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {access_token}"}
 
-        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
-            response = await client.request(method, url, headers=headers, params=params, json=json)
+        async with httpx.AsyncClient(
+            timeout=self.settings.request_timeout_seconds
+        ) as client:
+            response = await client.request(
+                method, url, headers=headers, params=params, json=json
+            )
 
         if response.status_code >= 400:
             logger.warning("Google Fit API failed: %s", response.text)

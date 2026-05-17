@@ -14,7 +14,9 @@ class DeviceCalendarService:
         self._calendars_by_user: dict[str, list[DeviceCalendar]] = {}
         self._events_by_user: dict[str, list[DeviceEvent]] = {}
 
-    def set_calendars(self, user_id: str, calendars: list[DeviceCalendar]) -> list[DeviceCalendar]:
+    def set_calendars(
+        self, user_id: str, calendars: list[DeviceCalendar]
+    ) -> list[DeviceCalendar]:
         self._calendars_by_user[user_id] = calendars
         return calendars
 
@@ -44,7 +46,9 @@ class DeviceCalendarService:
 
         return events
 
-    def create_event(self, user_id: str, payload: DeviceEventCreateRequest) -> DeviceEvent:
+    def create_event(
+        self, user_id: str, payload: DeviceEventCreateRequest
+    ) -> DeviceEvent:
         event_id = str(uuid4())
         event = DeviceEvent(
             id=event_id,

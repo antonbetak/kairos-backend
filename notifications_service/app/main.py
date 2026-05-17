@@ -83,7 +83,9 @@ async def obtener_id_usuario(authorization: str | None = Header(default=None)):
                 headers={"Authorization": f"Bearer {token}"},
             )
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=503, detail="No fue posible validar la autorización") from exc
+        raise HTTPException(
+            status_code=503, detail="No fue posible validar la autorización"
+        ) from exc
 
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -145,7 +147,9 @@ def crear_notificacion_interna(
     db: Session = Depends(get_db),
 ):
     if datos.id_usuario != id_usuario:
-        raise HTTPException(status_code=403, detail="No puedes crear notificaciones para otro usuario")
+        raise HTTPException(
+            status_code=403, detail="No puedes crear notificaciones para otro usuario"
+        )
 
     notificacion = crear_notificacion(db, datos.id_usuario, datos, datos.request_id)
     _log_event(
@@ -160,7 +164,9 @@ def crear_notificacion_interna(
     return notificacion
 
 
-@app.patch("/notificaciones/{notificacion_id}/leer", response_model=NotificacionRespuesta)
+@app.patch(
+    "/notificaciones/{notificacion_id}/leer", response_model=NotificacionRespuesta
+)
 def leer_notificacion(
     notificacion_id: UUID,
     id_usuario: UUID = Depends(obtener_id_usuario),
@@ -176,7 +182,9 @@ def leer_notificacion(
         raise HTTPException(status_code=404, detail="Notificación no encontrada")
 
     if notificacion.id_usuario != id_usuario:
-        raise HTTPException(status_code=403, detail="No puedes modificar esta notificación")
+        raise HTTPException(
+            status_code=403, detail="No puedes modificar esta notificación"
+        )
 
     return marcar_notificacion_leida(db, notificacion)
 

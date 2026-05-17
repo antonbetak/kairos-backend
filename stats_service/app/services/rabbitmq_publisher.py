@@ -79,7 +79,9 @@ def publicar_racha_actualizada(id_usuario: UUID, titulo: str, mensaje: str):
     )
 
 
-def publicar_notificacion_creada(id_usuario: UUID, titulo: str, mensaje: str, tipo: str):
+def publicar_notificacion_creada(
+    id_usuario: UUID, titulo: str, mensaje: str, tipo: str
+):
     return publicar_evento_notificacion(
         "notificacion.creada",
         id_usuario,

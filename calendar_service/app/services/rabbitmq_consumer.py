@@ -35,7 +35,9 @@ def _parse_datetime(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _calendar_event_window(start: datetime | None, end: datetime | None = None) -> tuple[EventDateTimeInput, EventDateTimeInput]:
+def _calendar_event_window(
+    start: datetime | None, end: datetime | None = None
+) -> tuple[EventDateTimeInput, EventDateTimeInput]:
     start_dt = start or datetime.now(timezone.utc)
     end_dt = end or (start_dt + timedelta(minutes=30))
     return (
@@ -45,7 +47,9 @@ def _calendar_event_window(start: datetime | None, end: datetime | None = None) 
 
 
 def _build_task_event(event: dict[str, Any]) -> dict[str, Any] | None:
-    start_dt = _parse_datetime(event.get("due_at")) or _parse_datetime(event.get("timestamp"))
+    start_dt = _parse_datetime(event.get("due_at")) or _parse_datetime(
+        event.get("timestamp")
+    )
     start, end = _calendar_event_window(start_dt)
     return {
         "summary": event.get("titulo") or "Kairos Task",
@@ -121,7 +125,9 @@ async def _sync_google_event(event: dict[str, Any]) -> None:
                 )
             return
 
-        logger.warning("No se pudo sincronizar evento %s en Google Calendar: %s", event_type, error)
+        logger.warning(
+            "No se pudo sincronizar evento %s en Google Calendar: %s", event_type, error
+        )
         return
 
 
@@ -145,10 +151,14 @@ def iniciar_consumidor() -> None:
             conexion = pika.BlockingConnection(parametros)
             canal = conexion.channel()
 
-            canal.exchange_declare(exchange=EXCHANGE, exchange_type="topic", durable=True)
+            canal.exchange_declare(
+                exchange=EXCHANGE, exchange_type="topic", durable=True
+            )
             canal.queue_declare(queue=QUEUE, durable=True)
             for routing_key in (TASK_CREATED, SCHEDULE_CREATED):
-                canal.queue_bind(exchange=EXCHANGE, queue=QUEUE, routing_key=routing_key)
+                canal.queue_bind(
+                    exchange=EXCHANGE, queue=QUEUE, routing_key=routing_key
+                )
 
             canal.basic_qos(prefetch_count=1)
             canal.basic_consume(queue=QUEUE, on_message_callback=manejar_mensaje)
@@ -156,5 +166,7 @@ def iniciar_consumidor() -> None:
             logger.info("Consumidor RabbitMQ de calendar iniciado")
             canal.start_consuming()
         except Exception as error:
-            logger.warning("No se pudo iniciar consumidor RabbitMQ de calendar: %s", error)
+            logger.warning(
+                "No se pudo iniciar consumidor RabbitMQ de calendar: %s", error
+            )
             time.sleep(5)

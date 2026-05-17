@@ -138,7 +138,9 @@ class GoogleOAuthService:
 
         return tokens
 
-    def verify_id_token(self, token: str, expected_nonce: str | None = None) -> dict[str, object]:
+    def verify_id_token(
+        self, token: str, expected_nonce: str | None = None
+    ) -> dict[str, object]:
         request = Request()
 
         try:
@@ -189,7 +191,9 @@ class GoogleOAuthService:
         headers = {"Authorization": f"Bearer {access_token}"}
 
         async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(self.settings.google_userinfo_uri, headers=headers)
+            response = await client.get(
+                self.settings.google_userinfo_uri, headers=headers
+            )
 
         if response.status_code >= 400:
             logger.warning("Google userinfo request failed: %s", response.text)
@@ -259,11 +263,21 @@ class GoogleOAuthService:
         )
 
     def _create_state(self) -> str:
-        payload = StatePayload(nonce=secrets.token_urlsafe(24), issued_at=int(time.time()))
-        payload_bytes = json.dumps(asdict(payload), separators=(",", ":")).encode("utf-8")
-        payload_token = base64.urlsafe_b64encode(payload_bytes).decode("utf-8").rstrip("=")
-        signature = hmac.new(self._state_secret, payload_token.encode("utf-8"), hashlib.sha256).digest()
-        signature_token = base64.urlsafe_b64encode(signature).decode("utf-8").rstrip("=")
+        payload = StatePayload(
+            nonce=secrets.token_urlsafe(24), issued_at=int(time.time())
+        )
+        payload_bytes = json.dumps(asdict(payload), separators=(",", ":")).encode(
+            "utf-8"
+        )
+        payload_token = (
+            base64.urlsafe_b64encode(payload_bytes).decode("utf-8").rstrip("=")
+        )
+        signature = hmac.new(
+            self._state_secret, payload_token.encode("utf-8"), hashlib.sha256
+        ).digest()
+        signature_token = (
+            base64.urlsafe_b64encode(signature).decode("utf-8").rstrip("=")
+        )
         return f"{payload_token}.{signature_token}"
 
     def _extract_state_payload(self, state: str) -> StatePayload:
@@ -280,7 +294,9 @@ class GoogleOAuthService:
             payload_token.encode("utf-8"),
             hashlib.sha256,
         ).digest()
-        expected_signature_token = base64.urlsafe_b64encode(expected_signature).decode("utf-8").rstrip("=")
+        expected_signature_token = (
+            base64.urlsafe_b64encode(expected_signature).decode("utf-8").rstrip("=")
+        )
 
         if not hmac.compare_digest(signature_token, expected_signature_token):
             raise HTTPException(
@@ -289,7 +305,9 @@ class GoogleOAuthService:
             )
 
         padding = "=" * (-len(payload_token) % 4)
-        payload_data = json.loads(base64.urlsafe_b64decode(f"{payload_token}{padding}").decode("utf-8"))
+        payload_data = json.loads(
+            base64.urlsafe_b64decode(f"{payload_token}{padding}").decode("utf-8")
+        )
 
         issued_at = int(payload_data.get("issued_at", 0))
         nonce = str(payload_data.get("nonce") or "").strip()

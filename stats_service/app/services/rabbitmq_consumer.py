@@ -38,9 +38,7 @@ logger = logging.getLogger(__name__)
 
 def evento_ya_procesado(db, event_id: str):
     return (
-        db.query(EventoProcesado)
-        .filter(EventoProcesado.event_id == event_id)
-        .first()
+        db.query(EventoProcesado).filter(EventoProcesado.event_id == event_id).first()
     )
 
 

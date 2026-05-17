@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 from app.models import NotificacionUsuario
 
 
-def crear_notificacion(db: Session, id_usuario: UUID, datos, request_id: UUID | None = None):
+def crear_notificacion(
+    db: Session, id_usuario: UUID, datos, request_id: UUID | None = None
+):
     notificacion = NotificacionUsuario(
         request_id=request_id,
         id_usuario=id_usuario,

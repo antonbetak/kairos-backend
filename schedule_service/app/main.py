@@ -86,7 +86,9 @@ def obtener_id_usuario(authorization: str | None = Header(default=None)):
             timeout=20.0,
         )
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=503, detail="No fue posible validar la autorización") from exc
+        raise HTTPException(
+            status_code=503, detail="No fue posible validar la autorización"
+        ) from exc
 
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
@@ -111,7 +113,9 @@ def obtener_token_google(
                 timeout=20.0,
             )
         except httpx.RequestError as exc:
-            raise HTTPException(status_code=503, detail="No fue posible validar el token de Google") from exc
+            raise HTTPException(
+                status_code=503, detail="No fue posible validar el token de Google"
+            ) from exc
 
         if response.status_code != 200 or response.json().get("blacklisted"):
             raise HTTPException(status_code=401, detail="Token de Google invalidado")
@@ -181,7 +185,9 @@ def crear_bloque(
         return existente
 
     if datos.fecha_fin <= datos.fecha_inicio:
-        raise HTTPException(status_code=400, detail="fecha_fin debe ser mayor que fecha_inicio")
+        raise HTTPException(
+            status_code=400, detail="fecha_fin debe ser mayor que fecha_inicio"
+        )
 
     bloque = models.ScheduleBlock(
         request_id=request_id,
@@ -207,7 +213,9 @@ def crear_bloque(
             .first()
         )
         if existente:
-            complete_idempotency("schedule", request_id, {"schedule_id": str(existente.id)})
+            complete_idempotency(
+                "schedule", request_id, {"schedule_id": str(existente.id)}
+            )
             return existente
         fail_idempotency("schedule", request_id)
         raise
@@ -302,7 +310,9 @@ def actualizar_bloque(
         return bloque
 
     if reservation.state == "PROCESSING" and not reservation.acquired:
-        raise HTTPException(status_code=409, detail="La actualización ya se está procesando")
+        raise HTTPException(
+            status_code=409, detail="La actualización ya se está procesando"
+        )
 
     if bloque.request_id == request_id:
         complete_idempotency("schedule", request_id, {"schedule_id": str(bloque.id)})
@@ -320,7 +330,9 @@ def actualizar_bloque(
     fecha_fin = datos.fecha_fin or bloque.fecha_fin
 
     if fecha_fin <= fecha_inicio:
-        raise HTTPException(status_code=400, detail="fecha_fin debe ser mayor que fecha_inicio")
+        raise HTTPException(
+            status_code=400, detail="fecha_fin debe ser mayor que fecha_inicio"
+        )
 
     status_anterior = bloque.status
 
@@ -343,7 +355,9 @@ def actualizar_bloque(
             .first()
         )
         if existente:
-            complete_idempotency("schedule", request_id, {"schedule_id": str(existente.id)})
+            complete_idempotency(
+                "schedule", request_id, {"schedule_id": str(existente.id)}
+            )
             return existente
         fail_idempotency("schedule", request_id)
         raise

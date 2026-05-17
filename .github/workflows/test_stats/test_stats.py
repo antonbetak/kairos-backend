@@ -36,16 +36,20 @@ class StatsServiceTests(unittest.TestCase):
     def test_enviar_notificacion_routes_correctly(self):
         user = uuid4()
 
-        with patch(
-            "app.services.estadisticas.publicar_racha_actualizada",
-            return_value=True,
-        ) as racha_pub, patch(
-            "app.services.estadisticas.publicar_notificacion_creada",
-            return_value=True,
-        ) as notif_pub, patch(
-            "app.services.estadisticas.publicar_logro_desbloqueado",
-            return_value=True,
-        ) as logro_pub:
+        with (
+            patch(
+                "app.services.estadisticas.publicar_racha_actualizada",
+                return_value=True,
+            ) as racha_pub,
+            patch(
+                "app.services.estadisticas.publicar_notificacion_creada",
+                return_value=True,
+            ) as notif_pub,
+            patch(
+                "app.services.estadisticas.publicar_logro_desbloqueado",
+                return_value=True,
+            ) as logro_pub,
+        ):
             self.assertTrue(
                 enviar_notificacion(user, "T", "M", "racha", "racha.actualizada")
             )
@@ -56,9 +60,7 @@ class StatsServiceTests(unittest.TestCase):
             )
             notif_pub.assert_called_once()
 
-            self.assertTrue(
-                enviar_notificacion(user, "T", "M", "otro", "otro.routing")
-            )
+            self.assertTrue(enviar_notificacion(user, "T", "M", "otro", "otro.routing"))
             logro_pub.assert_called_once()
 
     def test_registrar_tarea_creada_increments_counters(self):

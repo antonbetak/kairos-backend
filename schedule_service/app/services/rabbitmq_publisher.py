@@ -157,7 +157,9 @@ def publicar_horario_error(id_usuario: str, error: str, id_bloque: str | None = 
     )
 
 
-def publicar_bloque_completado(id_usuario: str, id_bloque: str, titulo: str, tipo: str | None):
+def publicar_bloque_completado(
+    id_usuario: str, id_bloque: str, titulo: str, tipo: str | None
+):
     return publicar_evento_schedule(
         routing_key="bloque.completado",
         id_usuario=id_usuario,

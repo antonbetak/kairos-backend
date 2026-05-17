@@ -28,7 +28,9 @@ def build_key(service_name: str, operation_id: UUID | str) -> str:
 def reserve(service_name: str, operation_id: UUID | str) -> IdempotencyReservation:
     key = build_key(service_name, operation_id)
     try:
-        acquired = redis_client.set(key, "PROCESSING", nx=True, ex=PROCESSING_TTL_SECONDS)
+        acquired = redis_client.set(
+            key, "PROCESSING", nx=True, ex=PROCESSING_TTL_SECONDS
+        )
         if acquired:
             return IdempotencyReservation(acquired=True, state="PROCESSING")
 
@@ -38,7 +40,9 @@ def reserve(service_name: str, operation_id: UUID | str) -> IdempotencyReservati
         return IdempotencyReservation(acquired=True, state=None)
 
 
-def complete(service_name: str, operation_id: UUID | str, payload: dict[str, str] | None = None) -> None:
+def complete(
+    service_name: str, operation_id: UUID | str, payload: dict[str, str] | None = None
+) -> None:
     key = build_key(service_name, operation_id)
     value = {
         "state": "COMPLETED",

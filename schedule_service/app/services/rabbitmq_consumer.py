@@ -58,5 +58,7 @@ def iniciar_consumidor():
             logger.info("Consumidor RabbitMQ de schedule iniciado")
             canal.start_consuming()
         except Exception as error:
-            logger.warning("No se pudo iniciar consumidor RabbitMQ de schedule: %s", error)
+            logger.warning(
+                "No se pudo iniciar consumidor RabbitMQ de schedule: %s", error
+            )
             time.sleep(5)

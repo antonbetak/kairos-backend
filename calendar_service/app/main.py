@@ -15,33 +15,33 @@ from app.services.rabbitmq_consumer import iniciar_consumidor
 settings = get_settings()
 
 logging.basicConfig(
-	level=getattr(logging, settings.log_level.upper(), logging.INFO),
-	format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(settings.app_name)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-	logger.info("Starting %s in %s mode", settings.app_name, settings.app_env)
-	Thread(target=iniciar_consumidor, daemon=True).start()
-	yield
-	logger.info("Stopping %s", settings.app_name)
+    logger.info("Starting %s in %s mode", settings.app_name, settings.app_env)
+    Thread(target=iniciar_consumidor, daemon=True).start()
+    yield
+    logger.info("Stopping %s", settings.app_name)
 
 
 app = FastAPI(
-	title="Kairos Google Calendar Service",
-	version="1.0.0",
-	description="Standalone Google Calendar integration for listing and managing events.",
-	lifespan=lifespan,
+    title="Kairos Google Calendar Service",
+    version="1.0.0",
+    description="Standalone Google Calendar integration for listing and managing events.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
-	CORSMiddleware,
-	allow_origins=settings.cors_origins_list(),
-	allow_credentials=False,
-	allow_methods=["*"],
-	allow_headers=["*"],
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list(),
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(health_router)
@@ -51,10 +51,10 @@ app.include_router(device_calendar_router)
 
 @app.get("/", include_in_schema=False)
 async def root() -> dict[str, str]:
-	return {
-		"service": settings.app_name,
-		"status": "running",
-		"docs": "/docs",
-		"health": "/health",
-		"ready": "/ready",
-	}
+    return {
+        "service": settings.app_name,
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health",
+        "ready": "/ready",
+    }
