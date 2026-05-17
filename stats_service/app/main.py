@@ -8,7 +8,7 @@ from fastapi import Header
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models  # noqa: F401
 from app.db import Base
 from app.db import SessionLocal
 from app.db import engine

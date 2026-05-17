@@ -1,8 +1,8 @@
+import os
 import sys
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-import os
 from types import ModuleType
 
 
@@ -24,8 +24,7 @@ fake_pika.BasicProperties = object
 fake_pika.DeliveryMode = type("DeliveryMode", (), {"Persistent": object()})
 sys.modules.setdefault("pika", fake_pika)
 
-
-from app.services.due_warning import _as_utc
+from app.services.due_warning import _as_utc  # noqa: E402
 
 
 class TaskServiceTests(unittest.TestCase):

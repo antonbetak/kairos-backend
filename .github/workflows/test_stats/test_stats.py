@@ -1,10 +1,10 @@
+import os
 import sys
 import unittest
-from uuid import uuid4
-from types import SimpleNamespace
 from pathlib import Path
-import os
 from types import ModuleType
+from types import SimpleNamespace
+from uuid import uuid4
 from unittest.mock import patch
 
 
@@ -26,8 +26,7 @@ fake_pika.BasicProperties = object
 fake_pika.DeliveryMode = type("DeliveryMode", (), {"Persistent": object()})
 sys.modules.setdefault("pika", fake_pika)
 
-
-from app.services.estadisticas import (
+from app.services.estadisticas import (  # noqa: E402
     enviar_notificacion,
     registrar_tarea_creada,
 )

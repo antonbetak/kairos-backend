@@ -1,8 +1,8 @@
+import os
 import sys
 import unittest
-from types import SimpleNamespace
 from pathlib import Path
-import os
+from types import SimpleNamespace
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -16,8 +16,7 @@ os.environ.setdefault("notifications_db_host", "localhost")
 os.environ.setdefault("notifications_db_port", "5432")
 os.environ.setdefault("notifications_db_name", "kairos")
 
-
-from app.services.notificaciones import (
+from app.services.notificaciones import (  # noqa: E402
     marcar_notificacion_leida,
     marcar_todas_como_leidas,
 )

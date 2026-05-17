@@ -4,7 +4,6 @@ import logging
 from functools import wraps
 
 import httpx
-import jwt
 from fastapi import Depends, Header, HTTPException, status
 from pydantic import BaseModel
 

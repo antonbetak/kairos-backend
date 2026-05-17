@@ -62,7 +62,7 @@ def marcar_todas_como_leidas(db: Session, id_usuario: UUID):
     notificaciones = (
         db.query(NotificacionUsuario)
         .filter(NotificacionUsuario.id_usuario == id_usuario)
-        .filter(NotificacionUsuario.leida == False)
+        .filter(NotificacionUsuario.leida.is_(False))
         .all()
     )
 
