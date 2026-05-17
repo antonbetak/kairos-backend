@@ -40,6 +40,9 @@ def _ensure_request_id_column() -> None:
             "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS request_id UUID"
         )
         connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS due_expired_sent_at TIMESTAMPTZ"
+        )
+        connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_tareas_request_id ON tareas (request_id)"
         )
 

@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from uuid import UUID
+from uuid import uuid4
 
 import pika
 
@@ -21,6 +22,7 @@ ROUTING_KEYS = [
     "Task.Created",
     "Task.Completed",
     "Task.Ditch",
+    "Task.Due",
     "Task.Error",
     "Schedule.Created",
     "Schedule.Updated",
@@ -60,6 +62,12 @@ def texto_por_defecto(event_type: str):
             "Tienes una tarea cercana a su vencimiento",
             "recordatorio",
         )
+    if event_type == "Task.Due":
+        return (
+            "Tarea vencida",
+            "Una tarea venció y requiere atención",
+            "alerta",
+        )
     if event_type == "bloque.completado":
         return "Bloque completado", "Completaste un bloque de concentración", "progreso"
     if event_type == "logro.desbloqueado":
@@ -69,13 +77,26 @@ def texto_por_defecto(event_type: str):
     return "Nueva notificación", "Tienes una nueva notificación", "notificacion"
 
 
+def _safe_uuid(value: str | None) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(str(value))
+    except ValueError:
+        return None
+
+
 def crear_notificacion_desde_evento(mensaje: dict):
     event_id = mensaje.get("event_id")
     event_type = mensaje.get("event_type")
-    id_usuario = mensaje.get("id_usuario")
+    raw_user_id = mensaje.get("id_usuario")
 
-    if not event_id or not event_type or not id_usuario:
+    if not event_id or not event_type or not raw_user_id:
         raise ValueError("Evento incompleto")
+
+    user_id_for_notification = _safe_uuid(str(raw_user_id))
+    if user_id_for_notification is None:
+        raise ValueError("id_usuario inválido en evento")
 
     reservation = reserve_idempotency("notifications", event_id)
     if reservation.state == "COMPLETED":
@@ -87,12 +108,10 @@ def crear_notificacion_desde_evento(mensaje: dict):
     titulo_default, mensaje_default, tipo_default = texto_por_defecto(event_type)
 
     notificacion = NotificacionUsuario(
-        request_id=UUID(str(mensaje.get("request_id")))
-        if mensaje.get("request_id")
-        else None,
-        id_usuario=UUID(str(id_usuario)),
+        request_id=_safe_uuid(mensaje.get("request_id")) or uuid4(),
+        id_usuario=user_id_for_notification,
         titulo=mensaje.get("titulo") or titulo_default,
-        mensaje=mensaje.get("mensaje") or mensaje.get("descripcion") or mensaje_default,
+        mensaje=mensaje.get("mensaje") or mensaje.get("descripcion") or mensaje.get("error") or mensaje_default,
         tipo=mensaje.get("tipo") or tipo_default,
     )
 

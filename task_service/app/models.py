@@ -26,6 +26,7 @@ class Tarea(Base):
     completada = Column(Boolean, default=False, nullable=False)
     due_at = Column(DateTime(timezone=True), nullable=True)
     due_warning_sent_at = Column(DateTime(timezone=True), nullable=True)
+    due_expired_sent_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),

@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.models import Tarea
+from app.services.rabbitmq_publisher import publicar_tarea_vencida
 from app.services.rabbitmq_publisher import publicar_tarea_due_warning
 
 
@@ -34,7 +35,6 @@ def verificar_vencimientos_pendientes() -> None:
                 select(Tarea)
                 .where(Tarea.completada.is_(False))
                 .where(Tarea.due_at.is_not(None))
-                .where(Tarea.due_warning_sent_at.is_(None))
                 .where(Tarea.due_at <= limite)
             )
             .scalars()
@@ -44,18 +44,33 @@ def verificar_vencimientos_pendientes() -> None:
         cambio = False
         for tarea in tareas:
             due_at = _as_utc(tarea.due_at)
-            minutes_left = max(0, int((due_at - ahora).total_seconds() // 60))
-            publicado = publicar_tarea_due_warning(
-                tarea.id_usuario,
-                str(tarea.id_tarea),
-                tarea.titulo,
-                tarea.descripcion,
-                due_at=due_at.isoformat(),
-                minutes_left=minutes_left,
-            )
-            if publicado:
-                tarea.due_warning_sent_at = ahora
-                cambio = True
+            if due_at <= ahora:
+                if tarea.due_expired_sent_at is None:
+                    publicado = publicar_tarea_vencida(
+                        tarea.id_usuario,
+                        str(tarea.id_tarea),
+                        tarea.titulo,
+                        tarea.descripcion,
+                        due_at=due_at.isoformat(),
+                    )
+                    if publicado:
+                        tarea.due_expired_sent_at = ahora
+                        cambio = True
+                continue
+
+            if tarea.due_warning_sent_at is None:
+                minutes_left = max(0, int((due_at - ahora).total_seconds() // 60))
+                publicado = publicar_tarea_due_warning(
+                    tarea.id_usuario,
+                    str(tarea.id_tarea),
+                    tarea.titulo,
+                    tarea.descripcion,
+                    due_at=due_at.isoformat(),
+                    minutes_left=minutes_left,
+                )
+                if publicado:
+                    tarea.due_warning_sent_at = ahora
+                    cambio = True
 
         if cambio:
             db.commit()

@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 import logging
 
 from fastapi import Depends, FastAPI
+from fastapi import Header
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
@@ -56,9 +57,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(proxy_router)
-
-
 @app.get("/", include_in_schema=False)
 async def root() -> dict[str, str]:
     return {
@@ -70,31 +68,70 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/tasks")
-async def obtener_tareas(usuario=Depends(obtener_usuario_actual)):
+async def obtener_tareas(
+    authorization: str | None = Header(default=None),
+    x_google_token: str | None = Header(default=None, alias="X-Google-Token"),
+    x_google_refresh: str | None = Header(default=None, alias="X-Google-Refresh"),
+    usuario=Depends(obtener_usuario_actual),
+):
     id_usuario = usuario["id_usuario"]
-    return await listar_tareas(id_usuario)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await listar_tareas(authorization, x_google_token, x_google_refresh)
 
 
 @app.post("/tasks")
-async def crear_nueva_tarea(datos: dict, usuario=Depends(obtener_usuario_actual)):
+async def crear_nueva_tarea(
+    datos: dict,
+    authorization: str | None = Header(default=None),
+    x_google_token: str | None = Header(default=None, alias="X-Google-Token"),
+    x_google_refresh: str | None = Header(default=None, alias="X-Google-Refresh"),
+    usuario=Depends(obtener_usuario_actual),
+):
     id_usuario = usuario["id_usuario"]
-    return await crear_tarea(id_usuario, datos)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await crear_tarea(authorization, datos, x_google_token, x_google_refresh)
 
 
 @app.patch("/tasks/{id_tarea}")
 async def actualizar_tarea_por_id(
     id_tarea: str,
     datos: dict,
+    authorization: str | None = Header(default=None),
+    x_google_token: str | None = Header(default=None, alias="X-Google-Token"),
+    x_google_refresh: str | None = Header(default=None, alias="X-Google-Refresh"),
     usuario=Depends(obtener_usuario_actual),
 ):
     id_usuario = usuario["id_usuario"]
-    return await actualizar_tarea(id_usuario, id_tarea, datos)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await actualizar_tarea(
+        authorization,
+        id_tarea,
+        datos,
+        x_google_token,
+        x_google_refresh,
+    )
 
 
 @app.delete("/tasks/{id_tarea}")
-async def eliminar_tarea_por_id(id_tarea: str, usuario=Depends(obtener_usuario_actual)):
+async def eliminar_tarea_por_id(
+    id_tarea: str,
+    authorization: str | None = Header(default=None),
+    x_google_token: str | None = Header(default=None, alias="X-Google-Token"),
+    x_google_refresh: str | None = Header(default=None, alias="X-Google-Refresh"),
+    usuario=Depends(obtener_usuario_actual),
+):
     id_usuario = usuario["id_usuario"]
-    return await eliminar_tarea(id_usuario, id_tarea)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await eliminar_tarea(
+        authorization,
+        id_tarea,
+        x_google_token,
+        x_google_refresh,
+    )
 
 
 @app.post("/schedule")
@@ -154,28 +191,118 @@ async def consultar_logros(usuario=Depends(obtener_usuario_actual)):
 
 
 @app.get("/notificaciones")
-async def obtener_notificaciones(usuario=Depends(obtener_usuario_actual)):
+async def obtener_notificaciones(
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
     id_usuario = usuario["id_usuario"]
-    return await listar_notificaciones(id_usuario)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await listar_notificaciones(authorization)
 
 
 @app.post("/notificaciones")
 async def crear_nueva_notificacion(
-    datos: dict, usuario=Depends(obtener_usuario_actual)
+    datos: dict,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
 ):
     id_usuario = usuario["id_usuario"]
-    return await crear_notificacion(id_usuario, datos)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await crear_notificacion(authorization, datos)
 
 
 @app.patch("/notificaciones/{notificacion_id}/leer")
 async def leer_notificacion(
-    notificacion_id: str, usuario=Depends(obtener_usuario_actual)
+    notificacion_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
 ):
     id_usuario = usuario["id_usuario"]
-    return await marcar_notificacion_leida(id_usuario, notificacion_id)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await marcar_notificacion_leida(authorization, notificacion_id)
+
+
+@app.patch("/notifications/{notificacion_id}/leer")
+async def leer_notification_alias_legacy(
+    notificacion_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    id_usuario = usuario["id_usuario"]
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await marcar_notificacion_leida(authorization, notificacion_id)
 
 
 @app.patch("/notificaciones/leer-todas")
-async def leer_todas_notificaciones(usuario=Depends(obtener_usuario_actual)):
+async def leer_todas_notificaciones(
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
     id_usuario = usuario["id_usuario"]
-    return await marcar_todas_notificaciones_leidas(id_usuario)
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await marcar_todas_notificaciones_leidas(authorization)
+
+
+@app.patch("/notifications/leer-todas")
+async def leer_todas_notifications_alias_legacy(
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    id_usuario = usuario["id_usuario"]
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await marcar_todas_notificaciones_leidas(authorization)
+
+
+@app.get("/notifications")
+async def obtener_notifications_alias(
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    id_usuario = usuario["id_usuario"]
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await listar_notificaciones(authorization)
+
+
+@app.post("/notifications")
+async def crear_notifications_alias(
+    datos: dict,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    id_usuario = usuario["id_usuario"]
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await crear_notificacion(authorization, datos)
+
+
+@app.patch("/notifications/{notificacion_id}/read")
+async def leer_notification_alias(
+    notificacion_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    id_usuario = usuario["id_usuario"]
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await marcar_notificacion_leida(authorization, notificacion_id)
+
+
+@app.patch("/notifications/read-all")
+async def leer_todas_notifications_alias(
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    id_usuario = usuario["id_usuario"]
+    if not authorization:
+        authorization = f"Bearer {id_usuario}"
+    return await marcar_todas_notificaciones_leidas(authorization)
+
+
+app.include_router(proxy_router)

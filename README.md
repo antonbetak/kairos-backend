@@ -12,15 +12,15 @@ El **API Gateway** es el unico punto de entrada expuesto. Todos los microservici
 - `auth_service`: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`, `/auth/verify`.
 - `calendar_service`: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST).
 - `googlefit_service`: `/fit/me`.
-- `task_service`: `/tasks` (GET/POST).
+- `task_service`: `/tasks` (GET/POST), `/tasks/{id}` (PATCH/DELETE).
 - `schedule_service`: `/schedule` (GET/POST), `/schedule/{id}` (GET/PATCH/DELETE).
 - `stt_service`: `/stt/*` (ej. `/stt/health`).
-- `notifications_service`: `/notifications/*` (ej. `/notifications/health`).
+- `notifications_service`: `/notificaciones` (GET/POST), `/notificaciones/{id}/leer` (PATCH), `/notificaciones/leer-todas` (PATCH). Alias en gateway: `/notifications`, `/notifications/{id}/read`, `/notifications/read-all`.
 - `stats_service`: `/stats/*` (ej. `/stats/health`).
 - `agent_service`: `/agent/*` (ej. `/agent/health`).
 - Healths via gateway: `/health/google_auth`, `/health/calendar`, `/health/fit`, `/health/auth_service`, `/health/schedule_service`, `/health/task_service`, `/health/stt_service`, `/health/notifications_service`, `/health/stats_service`, `/health/agent_service`.
 
-Nota: `/tasks` y `/schedule/*` requieren `Authorization: Bearer <token>` emitido por `auth_service`.
+Nota: `/tasks`, `/schedule/*`, `/notificaciones*` y `/notifications*` requieren `Authorization: Bearer <token>` emitido por `auth_service`.
 Nota: `auth_service` y `google_auth` son servicios distintos; sus rutas no colisionan.
 
 # Auditoria de ramas del API Gateway
@@ -46,7 +46,7 @@ Nota: `auth_service` y `google_auth` son servicios distintos; sus rutas no colis
 - `task_service` -> `/tasks` -> `http://task_service:8000`
 - `schedule_service` -> `/schedule`, `/schedule/{id}` -> `http://schedule_service:8000`
 - `stt_service` -> `/stt/*` -> `http://stt_service:8000`
-- `notifications_service` -> `/notifications/*` -> `http://notifications_service:8000`
+- `notifications_service` -> `/notificaciones*` (alias `/notifications*` en gateway) -> `http://notifications_service:8000`
 - `stats_service` -> `/stats/*` -> `http://stats_service:8000`
 - `agent_service` -> `/agent/*` -> `http://agent_service:8000`
 
@@ -80,8 +80,9 @@ Kairos usa RabbitMQ para la propagacion asíncrona entre microservicios. Los ser
 - `Task.Created`: lo publica `task_service`; lo consumen `notifications_service`, `schedule_service` y `stats_service`.
 - `Task.Completed`: lo publica `task_service`; lo consumen `notifications_service` y `stats_service`.
 - `Task.Ditch`: lo publica `task_service`; lo consumen `notifications_service` y `stats_service`.
-- `Task.Error`: lo publica `task_service`; queda para monitoreo/auditoría.
+- `Task.Error`: lo publica `task_service`; lo consume `notifications_service` para notificación automática de error.
 - `Task.DueWarning`: lo publica `task_service`; lo consume `notifications_service`.
+- `Task.Due`: lo publica `task_service` cuando una tarea ya venció; lo consume `notifications_service`.
 - `Task.Created`: también lo consume `calendar_service` para sincronizar en Google Calendar cuando llega `X-Google-Token`.
 - `Schedule.Created`: lo publica `schedule_service`; lo consumen `notifications_service`, `stats_service` y `calendar_service`.
 - `Schedule.Updated`: lo publica `schedule_service`; lo consumen `notifications_service` y `stats_service`.
@@ -92,9 +93,9 @@ Kairos usa RabbitMQ para la propagacion asíncrona entre microservicios. Los ser
 
 ## Como funciona
 
-`task_service` publica `Task.Created` con `due_at` y, si el request incluye `X-Google-Token` y opcionalmente `X-Google-Refresh`, `calendar_service` intenta crear el evento en Google Calendar. Si `due_at` existe, `task_service` además dispara `Task.DueWarning` cuando la tarea entra en la ventana de aviso configurada actualmente en 15 minutos.
+`task_service` publica `Task.Created` con `due_at` y, si el request incluye `X-Google-Token` y opcionalmente `X-Google-Refresh`, `calendar_service` intenta crear el evento en Google Calendar. Si `due_at` existe, `task_service` además dispara `Task.DueWarning` cuando la tarea entra en la ventana de aviso configurada actualmente en 15 minutos y `Task.Due` cuando la tarea ya está vencida.
 
-`schedule_service` publica `Schedule.Created` con `fecha_inicio` y `fecha_fin`, y `calendar_service` lo sincroniza en Google Calendar con la misma ventana horaria. `notifications_service` sigue consumiendo `Task.DueWarning` para crear la notificación de recordatorio.
+`schedule_service` publica `Schedule.Created` con `fecha_inicio` y `fecha_fin`, y `calendar_service` lo sincroniza en Google Calendar con la misma ventana horaria. `notifications_service` consume `Task.DueWarning`, `Task.Due`, `Task.Completed` y `Task.Error` para crear notificaciones automáticas.
 
 ## Como probarlo
 
@@ -104,7 +105,7 @@ Kairos usa RabbitMQ para la propagacion asíncrona entre microservicios. Los ser
 
 ```bash
 curl -X POST http://localhost:8000/tasks \
-  -H "X-User-Id: <uuid-usuario>" \
+  -H "Authorization: Bearer <jwt_auth_service>" \
   -H "X-Google-Token: <access_token_google>" \
   -H "Content-Type: application/json" \
   -d '{"titulo":"Revisar informe","descripcion":"Pendiente de hoy","due_at":"2026-05-14T18:30:00Z"}'
@@ -115,7 +116,7 @@ curl -X POST http://localhost:8000/tasks \
 
 ```bash
 curl -X POST http://localhost:8000/schedule \
-  -H "X-User-Id: <uuid-usuario>" \
+  -H "Authorization: Bearer <jwt_auth_service>" \
   -H "X-Google-Token: <access_token_google>" \
   -H "Content-Type: application/json" \
   -d '{"titulo":"Bloque profundo","descripcion":"Trabajo concentrado","fecha_inicio":"2026-05-14T19:00:00Z","fecha_fin":"2026-05-14T20:00:00Z","tipo":"focus","status":"planned"}'
@@ -123,6 +124,7 @@ curl -X POST http://localhost:8000/schedule \
 
 6. Verifica en Google Calendar o en los logs del `calendar_service` que `Schedule.Created` fue sincronizado.
 7. Para `Task.DueWarning`, crea una tarea con `due_at` dentro de 15 minutos y revisa el log de `task_service` y la lista de `notifications_service`; la notificación debería aparecer cuando el verificador detecte la ventana.
+8. Para `Task.Due`, crea una tarea con `due_at` en el pasado y revisa en `notifications_service` la notificación de tarea vencida.
 
 Nota: `docker-compose.dev.yml` y `docker-compose.prod.yml` cubren el stack de Google (auth/calendar/fit). Para el stack completo usa `docker-compose.yml`.
 

@@ -105,26 +105,26 @@ def publicar_tarea_creada(
 def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
         "Task.Completed",
-        id_usuario,
-        id_tarea,
-        titulo,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
     )
 
 
 def publicar_tarea_abandonada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
         "Task.Ditch",
-        id_usuario,
-        id_tarea,
-        titulo,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
     )
 
 
 def publicar_tarea_error(id_usuario: str, error: str, id_tarea: str | None = None):
     return publicar_evento_tarea(
         "Task.Error",
-        id_usuario,
-        id_tarea,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
         error=error,
     )
 
@@ -139,10 +139,28 @@ def publicar_tarea_due_warning(
 ):
     return publicar_evento_tarea(
         "Task.DueWarning",
-        id_usuario,
-        id_tarea,
-        titulo,
-        descripcion,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
+        descripcion=descripcion,
         due_at=due_at,
         minutes_left=minutes_left,
+    )
+
+
+def publicar_tarea_vencida(
+    id_usuario: str,
+    id_tarea: str,
+    titulo: str,
+    descripcion: str | None,
+    due_at: str,
+):
+    return publicar_evento_tarea(
+        "Task.Due",
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
+        descripcion=descripcion,
+        due_at=due_at,
+        minutes_left=0,
     )
