@@ -10,7 +10,7 @@ class ActivityEventCreate(BaseModel):
     event_type: str
     title: str
     message: str
-    visibility: str = "friends"
+    visibility: str = Field(default="friends", pattern="^(private|friends|public)$")
     source_entity_id: str | None = None
     extra_data: dict | None = None
 

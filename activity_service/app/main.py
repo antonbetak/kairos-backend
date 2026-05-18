@@ -1,5 +1,6 @@
 from datetime import datetime
 from secrets import token_urlsafe
+from threading import Thread
 from uuid import UUID
 
 from fastapi import Depends
@@ -29,6 +30,7 @@ from app.schemas import InviteResponse
 from app.schemas import ReactionCreate
 from app.schemas import ReactionResponse
 from app.schemas import VisibilityUpdate
+from app.services.rabbitmq_consumer import start_consumer
 
 
 app = FastAPI(title="Kairos Activity Service")
@@ -45,6 +47,7 @@ def get_db():
 @app.on_event("startup")
 def crear_tablas():
     Base.metadata.create_all(bind=engine)
+    Thread(target=start_consumer, daemon=True).start()
 
 
 @app.get("/health")
