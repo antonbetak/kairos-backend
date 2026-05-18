@@ -291,6 +291,25 @@ services:
       timeout: 5s
       retries: 5
 
+  activity_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-activity-postgres
+    environment:
+      POSTGRES_USER: ${ACTIVITY_DB_USER:-kairos_activity_user}
+      POSTGRES_PASSWORD: ${ACTIVITY_DB_PASSWORD:-kairos_activity_password}
+      POSTGRES_DB: ${ACTIVITY_DB_NAME:-kairos_activity_db}
+    ports:
+      - "5438:5432"
+    volumes:
+      - activity_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ACTIVITY_DB_USER:-kairos_activity_user} -d ${ACTIVITY_DB_NAME:-kairos_activity_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   schedule_service:
     build:
       context: ./schedule_service
@@ -387,6 +406,36 @@ services:
       timeout: 5s
       retries: 5
 
+  activity_service:
+    build:
+      context: ./activity_service
+    container_name: kairos-activity-service
+    restart: on-failure
+    environment:
+      ACTIVITY_DB_USER: ${ACTIVITY_DB_USER:-kairos_activity_user}
+      ACTIVITY_DB_PASSWORD: ${ACTIVITY_DB_PASSWORD:-kairos_activity_password}
+      ACTIVITY_DB_HOST: activity_postgres
+      ACTIVITY_DB_PORT: ${ACTIVITY_DB_PORT:-5432}
+      ACTIVITY_DB_NAME: ${ACTIVITY_DB_NAME:-kairos_activity_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_service:8000}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    depends_on:
+      activity_postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8012:8000"
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   agent_service:
     build:
       context: ./agent_service
@@ -410,6 +459,7 @@ volumes:
   task_postgres_data:
   schedule_postgres_data:
   notifications_postgres_data:
+  activity_postgres_data:
   redis_data:
   rabbitmq_data:
 
