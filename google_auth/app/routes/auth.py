@@ -3,6 +3,7 @@ from fastapi.responses import RedirectResponse
 
 from app.schemas import (
     GoogleAuthResponse,
+    GoogleAuthUrlResponse,
     GoogleMeResponse,
     GoogleRefreshRequest,
     GoogleRefreshResponse,
@@ -28,6 +29,18 @@ def _extract_bearer_token(authorization: str | None) -> str:
         )
 
     return parts[1]
+
+
+@router.get(
+    "/auth-url",
+    response_model=GoogleAuthUrlResponse,
+    summary="Get Google authentication URL",
+)
+async def get_google_auth_url(
+    oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
+) -> GoogleAuthUrlResponse:
+    authorization_url = oauth_service.build_authorization_url()
+    return GoogleAuthUrlResponse(url=authorization_url)
 
 
 @router.get("/login", summary="Start Google authentication")
