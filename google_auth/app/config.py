@@ -48,6 +48,19 @@ class Settings(BaseSettings):
         ...,
         validation_alias=AliasChoices("GOOGLE_CLIENT_SECRET", "google_client_secret"),
     )
+    google_client_id_ios: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_CLIENT_ID_IOS", "google_client_id_ios"),
+    )
+    google_client_id_android: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "GOOGLE_CLIENT_ID_ANDROID",
+            "ANDROID_CLIENT",
+            "android_client",
+            "google_client_id_android",
+        ),
+    )
     auth_service_url: str = Field(
         default="http://auth_service:8000",
         validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
@@ -55,6 +68,10 @@ class Settings(BaseSettings):
     google_redirect_uri: str = Field(
         ...,
         validation_alias=AliasChoices("GOOGLE_REDIRECT_URI", "google_redirect_uri"),
+    )
+    google_redirect_uris: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_REDIRECT_URIS", "google_redirect_uris"),
     )
     google_auth_uri: str = Field(
         default="https://accounts.google.com/o/oauth2/v2/auth",
@@ -110,6 +127,43 @@ class Settings(BaseSettings):
 
         parsed = [origin.strip() for origin in value.split(",") if origin.strip()]
         return parsed or default_origins
+
+    def allowed_redirect_uris(self) -> list[str]:
+        allowed = [self.google_redirect_uri]
+        value = self.google_redirect_uris
+
+        if value is None:
+            return allowed
+
+        value = str(value).strip()
+        if not value:
+            return allowed
+
+        if value.startswith("["):
+            try:
+                parsed = json.loads(value)
+            except json.JSONDecodeError:
+                parsed = None
+
+            if isinstance(parsed, list):
+                for item in parsed:
+                    item_value = str(item).strip()
+                    if item_value and item_value not in allowed:
+                        allowed.append(item_value)
+                return allowed
+
+        parsed = [item.strip() for item in value.split(",") if item.strip()]
+        for item in parsed:
+            if item not in allowed:
+                allowed.append(item)
+        return allowed
+
+    def allowed_google_client_ids(self) -> list[str]:
+        allowed = [self.google_client_id]
+        for item in (self.google_client_id_android, self.google_client_id_ios):
+            if item and item not in allowed:
+                allowed.append(item)
+        return allowed
 
 
 @lru_cache(maxsize=1)

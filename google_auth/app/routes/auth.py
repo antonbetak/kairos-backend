@@ -37,17 +37,39 @@ def _extract_bearer_token(authorization: str | None) -> str:
     summary="Get Google authentication URL",
 )
 async def get_google_auth_url(
+    platform: str | None = Query(
+        default=None,
+        description="Client platform (web, android, ios).",
+    ),
+    redirect_uri: str | None = Query(
+        default=None,
+        description="Override redirect URI for mobile clients.",
+    ),
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> GoogleAuthUrlResponse:
-    authorization_url = oauth_service.build_authorization_url()
+    authorization_url = oauth_service.build_authorization_url(
+        platform=platform,
+        redirect_uri=redirect_uri,
+    )
     return GoogleAuthUrlResponse(url=authorization_url)
 
 
 @router.get("/login", summary="Start Google authentication")
 async def start_google_login(
+    platform: str | None = Query(
+        default=None,
+        description="Client platform (web, android, ios).",
+    ),
+    redirect_uri: str | None = Query(
+        default=None,
+        description="Override redirect URI for mobile clients.",
+    ),
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> RedirectResponse:
-    authorization_url = oauth_service.build_authorization_url()
+    authorization_url = oauth_service.build_authorization_url(
+        platform=platform,
+        redirect_uri=redirect_uri,
+    )
     return RedirectResponse(url=authorization_url, status_code=307)
 
 
@@ -71,7 +93,10 @@ async def refresh_google_token(
     payload: GoogleRefreshRequest,
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> GoogleRefreshResponse:
-    tokens = await oauth_service.refresh_tokens(refresh_token=payload.refresh_token)
+    tokens = await oauth_service.refresh_tokens(
+        refresh_token=payload.refresh_token,
+        platform=payload.platform,
+    )
     if payload.access_token:
         await oauth_service.blacklist_access_token(payload.access_token)
     return GoogleRefreshResponse(tokens=tokens)
