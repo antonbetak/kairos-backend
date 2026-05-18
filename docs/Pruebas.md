@@ -1,3 +1,69 @@
+# Pruebas y evidencias
+
+Este documento describe pasos reproducibles para validar funcionalidades clave y dónde recoger evidencias (logs, respuestas HTTP, tablas en Postgres).
+
+## Preparación
+
+1. Levantar el stack:
+
+```bash
+docker compose up --build
+```
+
+2. Verificar health del gateway:
+
+```bash
+curl http://localhost:8000/health
+```
+
+3. Obtener access token de `auth_service` (ejemplo):
+
+```bash
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"moises@correo.com","password":"123456"}'
+```
+
+## Prueba: crear tarea y sincronizar con Google Calendar
+
+1. Consigue un `X-Google-Token` válido (desde `google_auth` o consola Google OAuth playground).
+2. Crear tarea con headers `Authorization` y `X-Google-Token`:
+
+```bash
+curl -X POST http://localhost:8000/tasks \
+  -H "Authorization: Bearer <jwt>" \
+  -H "X-Google-Token: <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"titulo":"Revisar informe","descripcion":"Pendiente de hoy","due_at":"2026-05-17T18:30:00Z"}'
+```
+
+3. Evidencias:
+  - Respuesta HTTP 200/201 con `id_tarea`.
+  - Log en `calendar_service` indicando intento de creación en Google.
+  - Evento creado en el calendario asociado al `X-Google-Token`.
+
+## Prueba: notificaciones por eventos
+
+1. Crear tarea que dispare `Task.DueWarning` o `Task.Due` (usar `due_at` apropiado).
+2. Verificar que `notifications_service` recibe evento y crea fila en su tabla `notifications`.
+3. Evidencias: consulta en la DB `SELECT * FROM notifications WHERE id_usuario = '<id>'` o revisar logs con `docker compose logs notifications_service`.
+
+## Prueba: Google Calendar endpoints directos
+
+Ejecutar `GET /google/calendars` con `X-Google-Token` y verificar listado de calendarios.
+
+```bash
+curl -H "X-Google-Token: <token>" http://localhost:8000/google/calendars
+```
+
+## Logs y DB
+
+- Logs de cada servicio: `docker compose logs <service_name>`.
+- Consultas a Postgres: utilizar `psql` dentro del contenedor correspondiente o exponer puerto en `docker-compose` en desarrollo.
+
+## Registro de evidencias
+
+- Guarda respuestas HTTP (JSON) y capturas de pantalla o exporta logs a ficheros para auditoría.
 **Pruebas — Auth y Google Auth**
 
 Este documento recoge los ejemplos de petición (JSON) y descripción para los endpoints de `auth` y `google_auth`/`calendar_service` utilizados en el proyecto.

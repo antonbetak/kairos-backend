@@ -59,406 +59,147 @@ copy .env.example .env
 ```
 
 2. Ajusta secretos y credenciales en `.env`.
-3. Levanta los servicios con Docker:
+
+# Kairos — Backend (Monorepo)
+
+Resumen breve del repositorio y guía principal. Este README contiene la información más relevante para entender, instalar y ejecutar el backend de Kairos.
+
+**Base URL (gateway):** `http://localhost:8000`
+
+**Estructura de alto nivel:** cada microservicio vive en una carpeta raíz (`auth_service`, `google_auth`, `calendar_service`, `task_service`, `schedule_service`, `notifications_service`, `googlefit_service`, `stats_service`, `agent_service`, `stt_service`) y el único punto de entrada expuesto al host es el API Gateway.
+
+**Nota importante:** muchas rutas expuestas por el gateway requieren autenticación con un `JWT` emitido por `auth_service`. Para integraciones con Google Calendar/Fit se usan tokens de Google (`X-Google-Token`).
+
+## 1. Nombre del proyecto
+
+- Kairos — Backend
+
+## 2. Nombre del equipo / startup
+
+- Equipo: Kairos (equipo de backend)
+
+## 3. Integrantes y roles
+
+- Moisés Rodríguez — Backend / Integración Google (ejemplo).  
+- [Rellenar con integrantes reales y roles]
+
+> Edita esta sección con los nombres y roles concretos del equipo.
+
+## 4. Problema que resolvemos
+
+Las personas necesitan una plataforma ligera que centralice tareas, horarios y notificaciones, sincronizando opcionalmente con servicios de Google (Calendar, Fit) y enviando notificaciones y métricas de forma asíncrona entre microservicios.
+
+## 5. Solución
+
+Conjunto de microservicios desacoplados que se comunican mediante RabbitMQ para eventos de dominio (p. ej. tareas creadas, tareas vencidas, horarios creados). Un API Gateway expone los endpoints al cliente y actúa como proxy hacia los servicios internos.
+
+## 6. Arquitectura general
+
+Arquitectura basada en microservicios + bus de eventos (RabbitMQ). El gateway es el único servicio con puertos publicados, el resto queda en la red interna de Docker Compose.
+
+Diagrama y más detalles en: [docs/arquitectura.md](docs/arquitectura.md)
+
+## 7. Tecnologías utilizadas
+
+- Python 3.x + FastAPI
+- PostgreSQL (cada servicio que necesita persistencia)
+- Redis (para caché y listas, p. ej. `redis_client` en servicios)
+- RabbitMQ (event bus)
+- Docker & Docker Compose
+- Google APIs (OAuth2 / Calendar / Fitness)
+
+## 8. Instrucciones de instalación
+
+1. Copia archivo de ejemplo de variables de entorno:
 
 ```bash
-docker compose up --build
+copy .env.example .env
 ```
 
-4. Verifica el gateway:
-
-```bash
-curl http://localhost:8000/health
-```
-
-Solo el API Gateway expone puertos al host; el resto de servicios quedan en red interna.
-
-# Eventos AMQP
-
-Kairos usa RabbitMQ para la propagacion asíncrona entre microservicios. Los servicios ya no deben llamarse entre sí por HTTP para mover eventos de dominio.
-
-- `Task.Created`: lo publica `task_service`; lo consumen `notifications_service`, `schedule_service` y `stats_service`.
-- `Task.Completed`: lo publica `task_service`; lo consumen `notifications_service` y `stats_service`.
-- `Task.Ditch`: lo publica `task_service`; lo consumen `notifications_service` y `stats_service`.
-- `Task.Error`: lo publica `task_service`; lo consume `notifications_service` para notificación automática de error.
-- `Task.DueWarning`: lo publica `task_service`; lo consume `notifications_service`.
-- `Task.Due`: lo publica `task_service` cuando una tarea ya venció; lo consume `notifications_service`.
-- `Task.Created`: también lo consume `calendar_service` para sincronizar en Google Calendar cuando llega `X-Google-Token`.
-- `Schedule.Created`: lo publica `schedule_service`; lo consumen `notifications_service`, `stats_service` y `calendar_service`.
-- `Schedule.Updated`: lo publica `schedule_service`; lo consumen `notifications_service` y `stats_service`.
-- `Schedule.Error`: lo publica `schedule_service`; queda para monitoreo/auditoría.
-- `bloque.completado`: evento adicional de negocio que se conserva porque sigue siendo coherente con el flujo actual.
-
-`agent_service` solo deja definidos los contratos de `Task.Created` y `Schedule.Created` como consumidores futuros, y el contrato de publicación de recomendaciones RAG queda como stub pendiente.
-
-## Como funciona
-
-`task_service` publica `Task.Created` con `due_at` y, si el request incluye `X-Google-Token` y opcionalmente `X-Google-Refresh`, `calendar_service` intenta crear el evento en Google Calendar. Si `due_at` existe, `task_service` además dispara `Task.DueWarning` cuando la tarea entra en la ventana de aviso configurada actualmente en 15 minutos y `Task.Due` cuando la tarea ya está vencida.
-
-`schedule_service` publica `Schedule.Created` con `fecha_inicio` y `fecha_fin`, y `calendar_service` lo sincroniza en Google Calendar con la misma ventana horaria. `notifications_service` consume `Task.DueWarning`, `Task.Due`, `Task.Completed` y `Task.Error` para crear notificaciones automáticas.
-
-## Como probarlo
-
-1. Arranca RabbitMQ y el stack completo con `docker compose up --build`.
-2. Obtén un `X-Google-Token` válido desde `google_auth`.
-3. Crea una tarea con vencimiento cercano:
-
-```bash
-curl -X POST http://localhost:8000/tasks \
-  -H "Authorization: Bearer <jwt_auth_service>" \
-  -H "X-Google-Token: <access_token_google>" \
-  -H "Content-Type: application/json" \
-  -d '{"titulo":"Revisar informe","descripcion":"Pendiente de hoy","due_at":"2026-05-14T18:30:00Z"}'
-```
-
-4. Verifica en los logs de `calendar_service` que se consumió `Task.Created` y se intentó sincronizar en Google Calendar.
-5. Crea un horario:
-
-```bash
-curl -X POST http://localhost:8000/schedule \
-  -H "Authorization: Bearer <jwt_auth_service>" \
-  -H "X-Google-Token: <access_token_google>" \
-  -H "Content-Type: application/json" \
-  -d '{"titulo":"Bloque profundo","descripcion":"Trabajo concentrado","fecha_inicio":"2026-05-14T19:00:00Z","fecha_fin":"2026-05-14T20:00:00Z","tipo":"focus","status":"planned"}'
-```
-
-6. Verifica en Google Calendar o en los logs del `calendar_service` que `Schedule.Created` fue sincronizado.
-7. Para `Task.DueWarning`, crea una tarea con `due_at` dentro de 15 minutos y revisa el log de `task_service` y la lista de `notifications_service`; la notificación debería aparecer cuando el verificador detecte la ventana.
-8. Para `Task.Due`, crea una tarea con `due_at` en el pasado y revisa en `notifications_service` la notificación de tarea vencida.
-
-Nota: `docker-compose.dev.yml` y `docker-compose.prod.yml` cubren el stack de Google (auth/calendar/fit). Para el stack completo usa `docker-compose.yml`.
-
-## Networks en Docker Compose
-
-No es estrictamente necesario definir `networks` cuando usas un solo archivo Compose, porque Docker crea una red por defecto. Aun asi, se recomienda declararla explicitamente por estas razones:
-
-- Hace explicita la red interna (`kairos-network`) para todos los servicios.
-- Permite controlar el driver (bridge) y mantener la misma red si luego divides el stack en varios archivos Compose.
-- Evita cambios de nombre automaticos de red si cambias el nombre del proyecto.
-
-Como funciona:
-
-- Todos los servicios que comparten `kairos-network` pueden resolverse por nombre de servicio (por ejemplo `auth_service`, `schedule_service`).
-- El trafico entre servicios se mantiene dentro de la red interna, mientras que solo los puertos publicados con `ports` quedan expuestos al host.
-
-# Pruebas basicas por servicio
-
-| Servicio | Comando | Observaciones |
-| --- | --- | --- |
-| API Gateway | `curl http://localhost:8000/health` | Punto de entrada unico. |
-| Google Auth | `curl http://localhost:8000/health/google_auth` | Health via gateway. |
-| Calendar | `curl http://localhost:8000/health/calendar` | Health via gateway. |
-| Google Fit | `curl http://localhost:8000/health/fit` | Health via gateway. |
-| Auth Service | `curl http://localhost:8000/health/auth_service` | Health via gateway. |
-| Schedule Service | `curl http://localhost:8000/health/schedule_service` | Health via gateway. |
-| Task Service | `curl http://localhost:8000/health/task_service` | Health via gateway. |
-| STT Service | `curl http://localhost:8000/health/stt_service` | Health via gateway. |
-| Notifications Service | `curl http://localhost:8000/health/notifications_service` | Health via gateway. |
-| Stats Service | `curl http://localhost:8000/health/stats_service` | Health via gateway. |
-| Agent Service | `curl http://localhost:8000/health/agent_service` | Health via gateway. |
-
-# Google Auth Service
-
-El microservicio `google_auth`, responsable únicamente del proceso de autenticación con Google (OAuth2 / OpenID Connect). No extrae ni persiste datos de Google Fit, Calendar u otros servicios.
-
-## Responsabilidades del servicio
-
-- Iniciar el flujo OAuth2 con Google (`/auth/google/login`).
-- Recibir el callback de Google, intercambiar el código por tokens, validar el `id_token` y devolver datos básicos del usuario (`/auth/google/callback`).
-- Exponer un healthcheck (`/health`).
-
-## Estructura relevante
-
-- `google_auth/app/main.py` — arranque de FastAPI, middleware CORS y registro de rutas.
-- `google_auth/app/config.py` — configuración validada desde variables de entorno.
-- `google_auth/app/routes/auth.py` — endpoints `/auth/google/login` y `/auth/google/callback`.
-- `google_auth/app/routes/health.py` — endpoint `/health`.
-- `google_auth/app/services/google_oauth.py` — lógica de OAuth, firma/validación de `state`, intercambio de código y validación de `id_token`.
-- `google_auth/requirements.txt` — dependencias.
-- `google_auth/Dockerfile` — imagen para producción.
-
-## Cómo funciona 
-
-1. Cliente solicita `GET /auth/google/login`.
-2. El servicio genera un `state` firmado (HMAC) que incluye un `nonce` y redirige al endpoint de autorización de Google.
-3. Google autentica al usuario y redirige a `GET /auth/google/callback?code=...&state=...`.
-4. El servicio valida la firma y la vigencia del `state`, intercambia el `code` por tokens en el endpoint de tokens de Google.
-5. Valida el `id_token` con la librería oficial (`google-auth`) y obtiene `userinfo` si es necesario.
-6. Devuelve JSON con `user` básico (email, name, picture, google_id) y el conjunto de tokens recibidos.
-
-## Configuración de Google Cloud Console
-
-### Paso 1: Crear un proyecto en Google Cloud
-
-1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
-2. En la barra superior, haz clic en el proyecto actual (o en "Seleccionar un proyecto").
-3. Haz clic en "NUEVO PROYECTO".
-4. Asigna un nombre (ej. "Kairos Backend", "Mi App") y elige una organización (opcional).
-5. Haz clic en "CREAR".
-6. Espera a que se cree el proyecto. Verás un mensaje "Creando proyecto..." y después se te redirigirá.
-
-### Paso 2: Habilitar Google+ API (para OpenID Connect)
-
-1. En Google Cloud Console, busca "Google+ API" o "OAuth Consent Screen" en la barra de búsqueda.
-2. Accede a **APIs y servicios > Biblioteca**.
-3. Busca "Google+ API" y haz clic en ella.
-4. Haz clic en "HABILITAR".
-
-1. Ve a **APIs y servicios > Pantalla de consentimiento OAuth**.
-2. Selecciona "Externo" como tipo de usuario.
-3. Haz clic en "CREAR".
-   - **Nombre de la aplicación**: tu nombre de app (ej. "Kairos Google Auth")
-   - **Email de asistencia**: tu email
-6. En la sección de "Permisos", haz clic en "AGREGAR O ELIMINAR PERMISOS".
-7. En la caja de búsqueda, busca y selecciona estos permisos:
-   - `openid`
-
-### Paso 4: Crear credenciales OAuth2
-
-   - Desarrollo: `http://localhost:8000/auth/google/callback`
-   - Staging: `https://staging-api.tu-dominio.com/auth/google/callback`
-   - Producción: `https://api.tu-dominio.com/auth/google/callback`
-7. Haz clic en "CREAR".
-8. Se mostrará una ventana modal con:
-   - `ID de cliente` (GOOGLE_CLIENT_ID)
-   - `Secreto de cliente` (GOOGLE_CLIENT_SECRET)
-9. **Copia estos valores** — los necesitarás en las variables de entorno del backend.
-#### 4.2 - Credencial para iOS (Expo/EAS)
-
-1. Nuevamente en **Credenciales**, haz clic en "CREAR CREDENCIALES".
-2. Selecciona "ID de cliente OAuth".
-3. Elige **Tipo de aplicación: Aplicación de iOS**.
-4. Asigna un nombre (ej. "Kairos Mobile iOS").
-   - Si no lo has configurado, usa: `com.yourcompany.kairos` (reemplaza `yourcompany` con tu nombre)
-6. En **ID de equipo**, déjalo vacío (si no tienes Apple Developer Team ID).
-7. Haz clic en "CREAR".
-8. Copia el `ID de cliente` que se genera (para uso en la app móvil).
-
-#### 4.3 - Credencial para Android (Expo/EAS)
-2. Selecciona "ID de cliente OAuth".
-3. Elige **Tipo de aplicación: Aplicación de Android**.
-4. Asigna un nombre (ej. "Kairos Mobile Android").
-5. En **Nombre del paquete**, ingresa tu package name de Android. Puedes encontrarlo en:
-   - `app.json` (campo `android.package`)
-   - Si no lo has configurado, usa: `com.yourcompany.kairos` (reemplaza `yourcompany` con tu nombre)
-6. En **Huella digital del certificado SHA-1**, necesitas obtener la del certificado de Expo:
-   - Ejecuta en terminal: `expo doctor --fix` o `eas build --local` para generar el certificado si aún no existe
-   - Alterna: Usa `openssl` para extraerla de tu keystore (si tienes uno), o déjalo en blanco por ahora y actualiza luego
-7. Haz clic en "CREAR".
-8. Copia el `ID de cliente` que se genera (para uso en la app móvil).
-
-### Paso 5: Configuración en app.json (Expo/EAS)
-
-Para que EAS compile y distribuya la app móvil correctamente, configura en tu `app.json`:
-
-```json
-{
-  "expo": {
-    "name": "Kairos",
-    "slug": "kairos",
-    "scheme": "kairos",
-    "version": "1.0.0",
-    "ios": {
-      "bundleIdentifier": "com.yourcompany.kairos",
-      "supportsTabletMode": true
-    },
-    "android": {
-      "package": "com.yourcompany.kairos",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
-    },
-    "plugins": [
-      ["expo-google-app-auth"]
-    ]
-  }
-}
-```
-
-**Nota**: Reemplaza `yourcompany` con tu nombre de compañía o un identificador único.
-
-### Paso 6: Configuración en EAS (eas.json)
-
-Crea o actualiza tu `eas.json` en la raíz del proyecto móvil:
-
-```json
-{
-  "cli": {
-    "version": ">= 5.4.0"
-  },
-  "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal"
-    },
-    "production": {
-      "distribution": "store"
-    }
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "your-email@icloud.com",
-        "appleTeamId": "YOUR_TEAM_ID"
-      }
-    }
-  }
-}
-```
-
-### Paso 7: Descargar credenciales y guardarlas
-
-1. En la página de **Credenciales**, busca todas tus credenciales OAuth2 creadas (Web, iOS, Android).
-2. Para cada una:
-   - Haz clic en el icono de descarga para descargar un JSON con la información (recomendado para resguardo).
-   - **NO subas estos JSONs a Git** — guárdalos localmente de forma segura.
-3. Anota los siguientes valores:
-   - **Web**: `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (para backend)
-   - **iOS**: `GOOGLE_CLIENT_ID_IOS` (para app móvil)
-   - **Android**: `GOOGLE_CLIENT_ID_ANDROID` (para app móvil)
-
-## Integración desde la app móvil (Expo)
-
-### Instalación de dependencias
-
-En tu proyecto Expo/React Native, instala las librerías necesarias:
-
-```bash
-npx expo install expo-google-app-auth
-npx expo install expo-web-browser
-npx expo install @react-native-async-storage/async-storage
-```
-
-
-### Variables de entorno en la app móvil
-
-Crea un `.env` en la raíz de tu proyecto Expo:
-
-```env
-EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID=your-android-client-id.apps.googleusercontent.com
-EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS=your-ios-client-id.apps.googleusercontent.com
-EXPO_PUBLIC_API_BASE_URL=https://api.tu-dominio.com
-```
-
-### Deploy con EAS CLI
-
-1. Instala y configura EAS CLI:
-
-```bash
-npm install -g eas-cli
-eas login
-```
-
-2. Crea un perfil de build (si no existe `eas.json`):
-
-```bash
-eas build:configure
-```
-
-3. Para compilar en desarrollo:
-
-```bash
-eas build --platform android --profile development
-eas build --platform ios --profile development
-```
-
-4. Para compilar para producción (Play Store / App Store):
-
-```bash
-eas build --platform android --profile production
-eas build --platform ios --profile production
-```
-
-5. Para submitir a las tiendas (requiere cuentas activas):
-
-```bash
-eas submit --platform android --latest
-eas submit --platform ios --latest
-```
-
-## Ejecutar y probar
-
-### Docker (desarrollo)
+2. Ajusta valores en `.env` (secretos, URLs, credenciales Google, claves JWT, base de datos).
+3. Construye y levanta el stack (desarrollo):
 
 ```bash
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-Verifica con:
+Para el stack completo (producción/staging):
 
 ```bash
-curl http://localhost:8000/health
+docker compose up --build
 ```
 
-###  Docker (producción)
+## 9. Instrucciones de ejecución (local)
 
-```bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
+- Levantar con Docker Compose (ver arriba).  
+- Para ejecutar un servicio individual en desarrollo (ej. `auth_service`), activa el entorno virtual del servicio y corre `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`.
 
-## Endpoints principales
+## 10. Variables de entorno
 
-- `GET /auth/google/login` — inicia el flujo, redirige a Google.
-- `GET /auth/google/callback` — callback que devuelve JSON con `user` y `tokens`.
-- `POST /auth/google/refresh` — refresca el `access_token` usando `refresh_token`.
-- `GET /auth/google/me` — devuelve el perfil del usuario usando `access_token` o `id_token`.
-- `GET /health` — healthcheck.
-- `GET /` — información básica del servicio.
+- Revisa `.env.example` para la lista de variables necesarias. Entre las más relevantes:
+  - `API_GATEWAY_PORT` — puerto del gateway (por defecto 8000)
+  - `DATABASE_URL` — cadena Postgres por servicio
+  - `JWT_SECRET`, `JWT_ALGORITHM` — configuración de tokens
+  - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — credenciales Google
+  - `RABBITMQ_URL` — URL de RabbitMQ
 
+## 11. Endpoints principales
 
-## Notas operativas
+Resumen de endpoints por servicio (a través del gateway):
 
-- El `state` se firma con `GOOGLE_CLIENT_SECRET` para evitar la necesidad de almacenamiento externo (stateless).
-- No se emite un JWT interno ni se persisten usuarios en esta fase.
-- Asegurar que los **Redirect URIs en Google Cloud Console coincidan exactamente** con `GOOGLE_REDIRECT_URI` en `.env`.
+- Auth (propio): `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`, `/auth/verify`  
+- Google OAuth: `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`  
+- Calendar: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE)  
+- Google Fit: `/fit/me`  
+- Tasks: `/tasks` (GET/POST), `/tasks/{id}` (PATCH/DELETE)  
+- Schedule: `/schedule` (GET/POST), `/schedule/{id}` (GET/PATCH/DELETE)  
+- Notifications: `/notificaciones` (GET/POST), `/notificaciones/{id}/leer` (PATCH) — alias `/notifications` en gateway  
 
-## Solución de problemas
+Detalles y ejemplos en: [docs/api.md](docs/api.md)
 
-- **Error "invalid_client"**: Verifica que `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` sean correctos.
-- **Error "redirect_uri_mismatch"**: Asegúrate de que el Redirect URI en Google Cloud Console coincida exactamente con `GOOGLE_REDIRECT_URI` (incluyendo http/https y puerto).
-- **Error al validar id_token**: Verifica que la hora del sistema sea correcta (puede afectar validaciones de tokens).
-- **CORS error**: Revisa que `CORS_ORIGINS` incluya el origen desde el cual se hace la solicitud.
+## 12. Eventos principales (AMQP)
 
-# Google Calendar Service
+Los eventos de dominio que circulan por RabbitMQ:
 
-Este microservicio integra Google Calendar API para listar calendarios, leer eventos y crear/actualizar/eliminar eventos. Solo opera con tokens de Google obtenidos en `google_auth`.
+- `Task.Created` — publicado por `task_service`. Consumidores: `notifications_service`, `schedule_service`, `stats_service`, `calendar_service` (si llega `X-Google-Token`).
+- `Task.Completed` — publicado por `task_service`. Consumidores: `notifications_service`, `stats_service`.
+- `Task.DueWarning` — publicado por `task_service`. Consumidor: `notifications_service`.
+- `Task.Due` — publicado por `task_service`. Consumidor: `notifications_service`.
+- `Schedule.Created`, `Schedule.Updated`, `Schedule.Error` — publicados por `schedule_service`. Consumidores: `notifications_service`, `stats_service`, `calendar_service`.
+- `bloque.completado` — evento de negocio adicional.
 
-## Google Cloud Console (Calendar API)
+Descripción detallada de contratos y payloads en: [docs/eventos.md](docs/eventos.md)
 
-1. Ve a **APIs y servicios > Biblioteca**.
-2. Busca **Google Calendar API** y pulsa **HABILITAR**.
-3. En la pantalla de consentimiento, asegúrate de incluir el scope:
-   - `https://www.googleapis.com/auth/calendar`
+## 13. Evidencias de pruebas
 
+Pruebas manuales y pasos reproducibles están documentados en: [docs/pruebas.md](docs/pruebas.md)
 
-## Seguridad (JWT + Google Token)
+## 14. Fallas simuladas
 
-Cada request requiere al menos **uno** de estos:
+Escenarios y cómo reproducir fallas controladas (p. ej. caída de RabbitMQ, error en Google API, expiración de tokens) en: [docs/fallas-simuladas.md](docs/fallas-simuladas.md)
 
-- `Authorization: Bearer <JWT>` (token interno)
-- `X-Google-Token: <access_token>` (token de Google)
+## 15. Lecciones aprendidas
 
-Para los endpoints de Google Calendar (`/google/*`) **se requiere** `X-Google-Token`.
-Si no tienes JWT interno, omite `Authorization` y envia solo `X-Google-Token`.
+- Preferir comunicación por eventos para desacoplar microservicios críticos.
+- Exponer un único gateway facilita CORS y seguridad, pero requiere manejo centralizado de timeouts y errores.
+- Mantener contratos de eventos y versiones ayuda a evolucionar consumidores sin rupturas.
 
+## 16. Documentación técnica adicional
 
-Header opcional:
+Todos los documentos técnicos se encuentran en la carpeta `docs/`:
 
-- `X-Google-Refresh: <refresh_token>` (si quieres refrescar)
+- [docs/requerimientos.md](docs/requerimientos.md)
+- [docs/arquitectura.md](docs/arquitectura.md)
+- [docs/modelo-datos.md](docs/modelo-datos.md)
+- [docs/eventos.md](docs/eventos.md)
+- [docs/api.md](docs/api.md)
+- [docs/pruebas.md](docs/pruebas.md)
+- [docs/fallas-simuladas.md](docs/fallas-simuladas.md)
+- [docs/decisiones-tecnicas.md](docs/decisiones-tecnicas.md)
 
-El JWT debe tener:
+----
 
-- `sub` con el UUID del usuario
-- `exp` válido
-
-## Variables de entorno requeridas (Calendar Service)
-
-- `JWT_SECRET`
-- `JWT_ALGORITHM` (ej: `HS256`)
+Si quieres que rellene los nombres de integrantes, ejemplos de payloads concretos o que genere diagramas (mermaid), dime qué prefieres y lo completo.
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_TOKEN_URI`
