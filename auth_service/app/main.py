@@ -61,6 +61,16 @@ def _extract_bearer_token(authorization: str | None) -> str:
 @app.on_event("startup")
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS handle VARCHAR(60)"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)"
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_usuarios_handle ON usuarios (handle)"
+        )
 
 
 @app.get("/health")
