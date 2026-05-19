@@ -18,10 +18,10 @@ def recalcular_porcentaje_cumplimiento(estadistica: EstadisticaUsuario):
         estadistica.porcentaje_cumplimiento = 0
         return
 
-    completadas = max(0, min(estadistica.tareas_completadas, estadistica.tareas_creadas))
-    estadistica.porcentaje_cumplimiento = (
-        completadas / estadistica.tareas_creadas * 100
+    completadas = max(
+        0, min(estadistica.tareas_completadas, estadistica.tareas_creadas)
     )
+    estadistica.porcentaje_cumplimiento = completadas / estadistica.tareas_creadas * 100
 
 
 def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):

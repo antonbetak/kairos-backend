@@ -142,7 +142,9 @@ def _task_to_agent_context(task: dict) -> dict:
 
 async def _listar_tareas_activas(authorization: str | None) -> list[dict]:
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
             response = await client.get(
                 f"{settings.task_service_url.rstrip('/')}/tasks",
                 headers=_authorization_header(authorization),
@@ -167,7 +169,9 @@ async def _listar_tareas_activas(authorization: str | None) -> list[dict]:
 
 async def _generar_bloques_con_agente(payload: dict) -> list[dict]:
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
             response = await client.post(
                 f"{settings.agent_service_url.rstrip('/')}/generate",
                 json=payload,

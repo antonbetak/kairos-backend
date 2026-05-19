@@ -205,7 +205,10 @@ def register_user(
 
 
 def _verify_internal_token(x_internal_token: str | None) -> None:
-    if settings.internal_service_token and x_internal_token != settings.internal_service_token:
+    if (
+        settings.internal_service_token
+        and x_internal_token != settings.internal_service_token
+    ):
         raise HTTPException(status_code=403, detail="Token interno invalido")
 
 
