@@ -13,6 +13,17 @@ from app.services.rabbitmq_publisher import publicar_notificacion_creada
 from app.services.rabbitmq_publisher import publicar_racha_actualizada
 
 
+def recalcular_porcentaje_cumplimiento(estadistica: EstadisticaUsuario):
+    if estadistica.tareas_creadas <= 0:
+        estadistica.porcentaje_cumplimiento = 0
+        return
+
+    completadas = max(0, min(estadistica.tareas_completadas, estadistica.tareas_creadas))
+    estadistica.porcentaje_cumplimiento = (
+        completadas / estadistica.tareas_creadas * 100
+    )
+
+
 def obtener_o_crear_estadistica_usuario(db: Session, id_usuario: UUID):
     estadistica = (
         db.query(EstadisticaUsuario)
@@ -129,12 +140,7 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     estadistica.tareas_completadas += 1
     estadistica.fecha_actualizacion = datetime.now(timezone.utc)
 
-    if estadistica.tareas_creadas > 0:
-        estadistica.porcentaje_cumplimiento = (
-            estadistica.tareas_completadas / estadistica.tareas_creadas * 100
-        )
-    else:
-        estadistica.porcentaje_cumplimiento = 0
+    recalcular_porcentaje_cumplimiento(estadistica)
 
     if estadistica.tareas_completadas >= 1:
         desbloquear_logro_si_no_existe(
@@ -185,6 +191,27 @@ def registrar_tarea_completada(db: Session, id_usuario: UUID):
     return estadistica
 
 
+def registrar_tarea_no_completada(db: Session, id_usuario: UUID):
+    estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
+    racha = obtener_o_crear_racha_usuario(db, id_usuario, "tareas")
+
+    if estadistica.tareas_completadas > 0:
+        estadistica.tareas_completadas -= 1
+
+    if racha.racha_actual > 0:
+        racha.racha_actual -= 1
+
+    estadistica.fecha_actualizacion = datetime.now(timezone.utc)
+    racha.ultima_fecha_actividad = date.today()
+    recalcular_porcentaje_cumplimiento(estadistica)
+
+    db.commit()
+    db.refresh(estadistica)
+    db.refresh(racha)
+
+    return estadistica
+
+
 def registrar_tarea_abandonada(db: Session, id_usuario: UUID):
     estadistica = obtener_o_crear_estadistica_usuario(db, id_usuario)
     racha = obtener_o_crear_racha_usuario(db, id_usuario, "tareas")
@@ -208,10 +235,7 @@ def registrar_tarea_creada(db: Session, id_usuario: UUID):
     estadistica.tareas_creadas += 1
     estadistica.fecha_actualizacion = datetime.now(timezone.utc)
 
-    if estadistica.tareas_creadas > 0:
-        estadistica.porcentaje_cumplimiento = (
-            estadistica.tareas_completadas / estadistica.tareas_creadas * 100
-        )
+    recalcular_porcentaje_cumplimiento(estadistica)
 
     db.commit()
     db.refresh(estadistica)

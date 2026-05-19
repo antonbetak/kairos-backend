@@ -12,6 +12,7 @@ from app.services.estadisticas import registrar_bloque_completado
 from app.services.estadisticas import registrar_horario_creado
 from app.services.estadisticas import registrar_tarea_completada
 from app.services.estadisticas import registrar_tarea_creada
+from app.services.estadisticas import registrar_tarea_no_completada
 from app.services.estadisticas import registrar_tarea_abandonada
 
 
@@ -20,6 +21,7 @@ EXCHANGE = "kairos.events"
 QUEUE = "stats.eventos"
 TASK_CREATED = "Task.Created"
 TASK_COMPLETED = "Task.Completed"
+TASK_UNCOMPLETED = "Task.Uncompleted"
 TASK_DITCH = "Task.Ditch"
 SCHEDULE_CREATED = "Schedule.Created"
 SCHEDULE_UPDATED = "Schedule.Updated"
@@ -27,6 +29,7 @@ BLOQUE_COMPLETADO = "bloque.completado"
 ROUTING_KEYS = [
     TASK_CREATED,
     TASK_COMPLETED,
+    TASK_UNCOMPLETED,
     TASK_DITCH,
     SCHEDULE_CREATED,
     SCHEDULE_UPDATED,
@@ -72,6 +75,19 @@ def procesar_tarea_completada(db, mensaje: dict):
     guardar_evento_procesado(db, event_id, event_type or TASK_COMPLETED)
     db.commit()
     logger.info("Evento Task.Completed recibido en stats")
+
+
+def procesar_tarea_no_completada(db, mensaje: dict):
+    event_id, event_type, id_usuario = datos_basicos_evento(mensaje)
+
+    if evento_ya_procesado(db, event_id):
+        logger.debug("Evento Task.Uncompleted ya procesado")
+        return
+
+    registrar_tarea_no_completada(db, id_usuario)
+    guardar_evento_procesado(db, event_id, event_type or TASK_UNCOMPLETED)
+    db.commit()
+    logger.info("Evento Task.Uncompleted recibido en stats")
 
 
 def procesar_tarea_creada(db, mensaje: dict):
@@ -146,6 +162,8 @@ def procesar_evento(mensaje: dict):
             procesar_tarea_creada(db, mensaje)
         elif event_type == TASK_COMPLETED:
             procesar_tarea_completada(db, mensaje)
+        elif event_type == TASK_UNCOMPLETED:
+            procesar_tarea_no_completada(db, mensaje)
         elif event_type == TASK_DITCH:
             procesar_tarea_abandonada(db, mensaje)
         elif event_type == SCHEDULE_CREATED:

@@ -111,6 +111,15 @@ def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
     )
 
 
+def publicar_tarea_no_completada(id_usuario: str, id_tarea: str, titulo: str):
+    return publicar_evento_tarea(
+        "Task.Uncompleted",
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
+    )
+
+
 def publicar_tarea_abandonada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
         "Task.Ditch",
