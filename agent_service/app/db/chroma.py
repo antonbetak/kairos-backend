@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import logging
+from typing import Optional
+
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
@@ -6,11 +10,11 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: chromadb.HttpClient | None = None
+_client: Optional[chromadb.HttpClient] = None
 _collection = None
 
 
-def get_client() -> chromadb.HttpClient:
+def get_client():
     global _client
     if _client is None:
         _client = chromadb.HttpClient(
