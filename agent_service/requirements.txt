@@ -1,2 +1,8 @@
 fastapi
 uvicorn[standard]
+pydantic-settings
+chromadb-client
+google-generativeai
+pika
+httpx
+python-dotenv
