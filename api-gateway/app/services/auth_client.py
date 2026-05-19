@@ -173,7 +173,7 @@ async def _decode_clerk_token(token: str) -> dict[str, Any] | None:
 
 
 async def _sync_clerk_user(profile: dict[str, Any]) -> dict[str, Any] | None:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/clerk/sync"
+    url = f"{settings.google_auth_url.rstrip('/')}/auth/google/clerk/session"
     headers = {}
     if settings.internal_service_token:
         headers["X-Internal-Token"] = settings.internal_service_token
