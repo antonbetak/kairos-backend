@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime
 
-import google.generativeai as genai
+from google import genai
 
 from app.config import settings
 from app.db.chroma import contar_documentos_usuario, query_patrones
@@ -14,8 +14,7 @@ logger = logging.getLogger(__name__)
 # Mínimo de documentos en ChromaDB para considerar que hay historial suficiente
 MIN_DOCS_PARA_RAG = 3
 
-genai.configure(api_key=settings.gemini_api_key)
-_model = genai.GenerativeModel(settings.gemini_model)
+_client_gemini = genai.Client(api_key=settings.gemini_api_key)
 
 
 def _construir_contexto_rag(id_usuario: str) -> str:
@@ -160,7 +159,10 @@ async def generar_horario(request: GenerateRequest) -> GenerateResponse:
 
     try:
         logger.info("Llamando a Gemini para usuario %s, fecha %s", id_usuario, request.fecha)
-        response = _model.generate_content(prompt)
+        response = _client_gemini.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+        )
         texto_respuesta = response.text
 
         bloques = _parsear_respuesta_gemini(texto_respuesta, request)
