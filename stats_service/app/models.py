@@ -25,7 +25,9 @@ class EstadisticaUsuario(Base):
     bloques_completados = Column(Integer, default=0)
     porcentaje_cumplimiento = Column(Float, default=0)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
-    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_actualizacion = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
 class RachaUsuario(Base):
@@ -38,7 +40,9 @@ class RachaUsuario(Base):
     mejor_racha = Column(Integer, default=0)
     ultima_fecha_actividad = Column(Date, nullable=True)
     fecha_creacion = Column(DateTime, default=datetime.utcnow)
-    fecha_actualizacion = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_actualizacion = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
 class LogroUsuario(Base):

@@ -40,7 +40,9 @@ class GoogleCalendarService:
     ) -> dict[str, Any]:
         url = f"{self.base_url}/calendars/{calendar_id}/events"
         params = {"sendUpdates": send_updates} if send_updates else None
-        return await self._request("POST", url, access_token, params=params, json=payload)
+        return await self._request(
+            "POST", url, access_token, params=params, json=payload
+        )
 
     async def update_event(
         self,
@@ -53,9 +55,13 @@ class GoogleCalendarService:
         # Google Calendar supports PATCH for partial updates.
         url = f"{self.base_url}/calendars/{calendar_id}/events/{event_id}"
         params = {"sendUpdates": send_updates} if send_updates else None
-        return await self._request("PATCH", url, access_token, params=params, json=payload)
+        return await self._request(
+            "PATCH", url, access_token, params=params, json=payload
+        )
 
-    async def delete_event(self, access_token: str, calendar_id: str, event_id: str) -> None:
+    async def delete_event(
+        self, access_token: str, calendar_id: str, event_id: str
+    ) -> None:
         url = f"{self.base_url}/calendars/{calendar_id}/events/{event_id}"
         await self._request("DELETE", url, access_token)
 
@@ -67,7 +73,9 @@ class GoogleCalendarService:
             "grant_type": "refresh_token",
         }
 
-        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=self.settings.request_timeout_seconds
+        ) as client:
             response = await client.post(self.settings.google_token_uri, data=payload)
 
         if response.status_code >= 400:
@@ -124,7 +132,9 @@ class GoogleCalendarService:
         if reminders is not None:
             event["reminders"] = {
                 "useDefault": False,
-                "overrides": [reminder.model_dump(by_alias=True) for reminder in reminders],
+                "overrides": [
+                    reminder.model_dump(by_alias=True) for reminder in reminders
+                ],
             }
 
         return event
@@ -155,8 +165,12 @@ class GoogleCalendarService:
     ) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {access_token}"}
 
-        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
-            response = await client.request(method, url, headers=headers, params=params, json=json)
+        async with httpx.AsyncClient(
+            timeout=self.settings.request_timeout_seconds
+        ) as client:
+            response = await client.request(
+                method, url, headers=headers, params=params, json=json
+            )
 
         if response.status_code >= 400:
             logger.warning("Google Calendar API failed: %s", response.text)

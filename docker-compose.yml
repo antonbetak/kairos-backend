@@ -16,6 +16,8 @@ services:
         condition: service_started
       notifications_service:
         condition: service_started
+      activity_service:
+        condition: service_started
     networks:
       - kairos-network
 
@@ -231,6 +233,7 @@ services:
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_DB: ${REDIS_DB:-0}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-}
     depends_on:
       auth_postgres:
         condition: service_healthy
@@ -291,6 +294,25 @@ services:
       timeout: 5s
       retries: 5
 
+  activity_postgres:
+    image: postgres:16-alpine
+    container_name: kairos-activity-postgres
+    environment:
+      POSTGRES_USER: ${ACTIVITY_DB_USER:-kairos_activity_user}
+      POSTGRES_PASSWORD: ${ACTIVITY_DB_PASSWORD:-kairos_activity_password}
+      POSTGRES_DB: ${ACTIVITY_DB_NAME:-kairos_activity_db}
+    ports:
+      - "5438:5432"
+    volumes:
+      - activity_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${ACTIVITY_DB_USER:-kairos_activity_user} -d ${ACTIVITY_DB_NAME:-kairos_activity_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   schedule_service:
     build:
       context: ./schedule_service
@@ -302,11 +324,19 @@ services:
       SCHEDULE_DB_HOST: schedule_postgres
       SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT:-5432}
       SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_service:8000}
+      TASK_SERVICE_URL: ${TASK_SERVICE_URL:-http://task_service:8000}
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL:-http://agent_service:8000}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       schedule_postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - kairos-network
@@ -330,12 +360,17 @@ services:
       TASK_DB_PORT: ${TASK_DB_PORT:-5432}
       TASK_DB_NAME: ${TASK_DB_NAME:-kairos_task_db}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     ports:
       - "8002:8000"
     depends_on:
       task_postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - kairos-network
@@ -356,14 +391,50 @@ services:
       NOTIFICATIONS_DB_HOST: notifications_postgres
       NOTIFICATIONS_DB_PORT: ${NOTIFICATIONS_DB_PORT:-5432}
       NOTIFICATIONS_DB_NAME: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_service:8000}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_DB: ${REDIS_DB:-0}
     depends_on:
       notifications_postgres:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8006:8000"
+    networks:
+      - kairos-network
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  activity_service:
+    build:
+      context: ./activity_service
+    container_name: kairos-activity-service
+    restart: on-failure
+    environment:
+      ACTIVITY_DB_USER: ${ACTIVITY_DB_USER:-kairos_activity_user}
+      ACTIVITY_DB_PASSWORD: ${ACTIVITY_DB_PASSWORD:-kairos_activity_password}
+      ACTIVITY_DB_HOST: activity_postgres
+      ACTIVITY_DB_PORT: ${ACTIVITY_DB_PORT:-5432}
+      ACTIVITY_DB_NAME: ${ACTIVITY_DB_NAME:-kairos_activity_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_service:8000}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    depends_on:
+      activity_postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8012:8000"
     networks:
       - kairos-network
     healthcheck:
@@ -395,6 +466,7 @@ volumes:
   task_postgres_data:
   schedule_postgres_data:
   notifications_postgres_data:
+  activity_postgres_data:
   redis_data:
   rabbitmq_data:
 

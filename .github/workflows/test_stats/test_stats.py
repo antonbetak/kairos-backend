@@ -1,0 +1,95 @@
+import os
+import sys
+import unittest
+from pathlib import Path
+from types import ModuleType
+from types import SimpleNamespace
+from uuid import uuid4
+from unittest.mock import patch
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+STATS_SERVICE_ROOT = REPO_ROOT / "stats_service"
+if str(STATS_SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(STATS_SERVICE_ROOT))
+
+os.environ.setdefault("stats_db_user", "kairos")
+os.environ.setdefault("stats_db_password", "kairos")
+os.environ.setdefault("stats_db_host", "localhost")
+os.environ.setdefault("stats_db_port", "5432")
+os.environ.setdefault("stats_db_name", "kairos")
+
+fake_pika = ModuleType("pika")
+fake_pika.URLParameters = object
+fake_pika.BlockingConnection = object
+fake_pika.BasicProperties = object
+fake_pika.DeliveryMode = type("DeliveryMode", (), {"Persistent": object()})
+sys.modules.setdefault("pika", fake_pika)
+
+from app.services.estadisticas import (  # noqa: E402
+    enviar_notificacion,
+    registrar_tarea_creada,
+)
+
+
+class StatsServiceTests(unittest.TestCase):
+    def test_enviar_notificacion_routes_correctly(self):
+        user = uuid4()
+
+        with (
+            patch(
+                "app.services.estadisticas.publicar_racha_actualizada",
+                return_value=True,
+            ) as racha_pub,
+            patch(
+                "app.services.estadisticas.publicar_notificacion_creada",
+                return_value=True,
+            ) as notif_pub,
+            patch(
+                "app.services.estadisticas.publicar_logro_desbloqueado",
+                return_value=True,
+            ) as logro_pub,
+        ):
+            self.assertTrue(
+                enviar_notificacion(user, "T", "M", "racha", "racha.actualizada")
+            )
+            racha_pub.assert_called_once()
+
+            self.assertTrue(
+                enviar_notificacion(user, "T", "M", "tipo", "notificacion.creada")
+            )
+            notif_pub.assert_called_once()
+
+            self.assertTrue(enviar_notificacion(user, "T", "M", "otro", "otro.routing"))
+            logro_pub.assert_called_once()
+
+    def test_registrar_tarea_creada_increments_counters(self):
+        user = uuid4()
+
+        estadistica = SimpleNamespace(
+            tareas_creadas=0,
+            tareas_completadas=0,
+            porcentaje_cumplimiento=0,
+            fecha_actualizacion=None,
+        )
+
+        class DummyDB:
+            def commit(self):
+                pass
+
+            def refresh(self, obj):
+                pass
+
+        db = DummyDB()
+
+        with patch(
+            "app.services.estadisticas.obtener_o_crear_estadistica_usuario",
+            return_value=estadistica,
+        ):
+            result = registrar_tarea_creada(db, user)
+
+        self.assertEqual(result.tareas_creadas, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

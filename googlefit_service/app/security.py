@@ -123,7 +123,9 @@ def _validate_scopes(token_scopes: str) -> list[str]:
 
 async def require_google_token(
     authorization: str | None = Header(None, description="Bearer Google access_token"),
-    google_token: str | None = Header(None, alias="X-Google-Token", description="Google access_token"),
+    google_token: str | None = Header(
+        None, alias="X-Google-Token", description="Google access_token"
+    ),
     google_refresh: str | None = Header(None, alias="X-Google-Refresh"),
 ) -> FitAuthContext:
     access_token = _select_google_token(authorization, google_token)

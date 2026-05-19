@@ -18,6 +18,7 @@ def publicar_evento_tarea(
     routing_key: str,
     id_usuario: str,
     id_tarea: str | None = None,
+    request_id: str | None = None,
     titulo: str | None = None,
     descripcion: str | None = None,
     error: str | None = None,
@@ -34,6 +35,8 @@ def publicar_evento_tarea(
     }
     if id_tarea:
         mensaje["id_tarea"] = id_tarea
+    if request_id:
+        mensaje["request_id"] = request_id
     if titulo:
         mensaje["titulo"] = titulo
     if descripcion:
@@ -69,11 +72,9 @@ def publicar_evento_tarea(
             ),
         )
         conexion.close()
-        print(f"Evento {routing_key} publicado")
         logger.info("Evento %s publicado", routing_key)
         return True
     except Exception as error:
-        print(f"No se pudo publicar {routing_key}: {error}")
         logger.warning("No se pudo publicar %s: %s", routing_key, error)
         return False
 
@@ -81,6 +82,7 @@ def publicar_evento_tarea(
 def publicar_tarea_creada(
     id_usuario: str,
     id_tarea: str,
+    request_id: str,
     titulo: str,
     descripcion: str | None,
     due_at: str | None = None,
@@ -91,6 +93,7 @@ def publicar_tarea_creada(
         "Task.Created",
         id_usuario,
         id_tarea,
+        request_id,
         titulo,
         descripcion,
         due_at=due_at,
@@ -102,26 +105,35 @@ def publicar_tarea_creada(
 def publicar_tarea_completada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
         "Task.Completed",
-        id_usuario,
-        id_tarea,
-        titulo,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
+    )
+
+
+def publicar_tarea_no_completada(id_usuario: str, id_tarea: str, titulo: str):
+    return publicar_evento_tarea(
+        "Task.Uncompleted",
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
     )
 
 
 def publicar_tarea_abandonada(id_usuario: str, id_tarea: str, titulo: str):
     return publicar_evento_tarea(
         "Task.Ditch",
-        id_usuario,
-        id_tarea,
-        titulo,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
     )
 
 
 def publicar_tarea_error(id_usuario: str, error: str, id_tarea: str | None = None):
     return publicar_evento_tarea(
         "Task.Error",
-        id_usuario,
-        id_tarea,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
         error=error,
     )
 
@@ -136,10 +148,28 @@ def publicar_tarea_due_warning(
 ):
     return publicar_evento_tarea(
         "Task.DueWarning",
-        id_usuario,
-        id_tarea,
-        titulo,
-        descripcion,
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
+        descripcion=descripcion,
         due_at=due_at,
         minutes_left=minutes_left,
+    )
+
+
+def publicar_tarea_vencida(
+    id_usuario: str,
+    id_tarea: str,
+    titulo: str,
+    descripcion: str | None,
+    due_at: str,
+):
+    return publicar_evento_tarea(
+        "Task.Due",
+        id_usuario=id_usuario,
+        id_tarea=id_tarea,
+        titulo=titulo,
+        descripcion=descripcion,
+        due_at=due_at,
+        minutes_left=0,
     )

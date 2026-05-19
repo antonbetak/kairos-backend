@@ -3,12 +3,16 @@ import logging
 import os
 import time
 from uuid import UUID
+from uuid import uuid4
 
 import pika
 
 from app.db import SessionLocal
 from app.models import EventoProcesado
 from app.models import NotificacionUsuario
+from app.services.idempotency import complete as complete_idempotency
+from app.services.idempotency import fail as fail_idempotency
+from app.services.idempotency import reserve as reserve_idempotency
 
 
 RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
@@ -18,6 +22,7 @@ ROUTING_KEYS = [
     "Task.Created",
     "Task.Completed",
     "Task.Ditch",
+    "Task.Due",
     "Task.Error",
     "Schedule.Created",
     "Schedule.Updated",
@@ -46,9 +51,23 @@ def texto_por_defecto(event_type: str):
     if event_type == "Schedule.Updated":
         return "Horario actualizado", "Tu horario fue actualizado", "recordatorio"
     if event_type == "Schedule.Error":
-        return "Error en horario", "Ocurrió un problema al procesar un horario", "alerta"
+        return (
+            "Error en horario",
+            "Ocurrió un problema al procesar un horario",
+            "alerta",
+        )
     if event_type == "Task.DueWarning":
-        return "Tarea próxima a vencer", "Tienes una tarea cercana a su vencimiento", "recordatorio"
+        return (
+            "Tarea próxima a vencer",
+            "Tienes una tarea cercana a su vencimiento",
+            "recordatorio",
+        )
+    if event_type == "Task.Due":
+        return (
+            "Tarea vencida",
+            "Una tarea venció y requiere atención",
+            "alerta",
+        )
     if event_type == "bloque.completado":
         return "Bloque completado", "Completaste un bloque de concentración", "progreso"
     if event_type == "logro.desbloqueado":
@@ -58,20 +77,44 @@ def texto_por_defecto(event_type: str):
     return "Nueva notificación", "Tienes una nueva notificación", "notificacion"
 
 
+def _safe_uuid(value: str | None) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(str(value))
+    except ValueError:
+        return None
+
+
 def crear_notificacion_desde_evento(mensaje: dict):
     event_id = mensaje.get("event_id")
     event_type = mensaje.get("event_type")
-    id_usuario = mensaje.get("id_usuario")
+    raw_user_id = mensaje.get("id_usuario")
 
-    if not event_id or not event_type or not id_usuario:
+    if not event_id or not event_type or not raw_user_id:
         raise ValueError("Evento incompleto")
+
+    user_id_for_notification = _safe_uuid(str(raw_user_id))
+    if user_id_for_notification is None:
+        raise ValueError("id_usuario inválido en evento")
+
+    reservation = reserve_idempotency("notifications", event_id)
+    if reservation.state == "COMPLETED":
+        return
+
+    if reservation.state == "PROCESSING" and not reservation.acquired:
+        return
 
     titulo_default, mensaje_default, tipo_default = texto_por_defecto(event_type)
 
     notificacion = NotificacionUsuario(
-        id_usuario=UUID(str(id_usuario)),
+        request_id=_safe_uuid(mensaje.get("request_id")) or uuid4(),
+        id_usuario=user_id_for_notification,
         titulo=mensaje.get("titulo") or titulo_default,
-        mensaje=mensaje.get("mensaje") or mensaje.get("descripcion") or mensaje_default,
+        mensaje=mensaje.get("mensaje")
+        or mensaje.get("descripcion")
+        or mensaje.get("error")
+        or mensaje_default,
         tipo=mensaje.get("tipo") or tipo_default,
     )
 
@@ -83,7 +126,18 @@ def crear_notificacion_desde_evento(mensaje: dict):
             .first()
         )
         if evento_procesado:
-            print(f"Evento {event_type} ya procesado en notifications")
+            complete_idempotency("notifications", event_id, {"event_type": event_type})
+            return
+
+        notificacion_existente = (
+            db.query(NotificacionUsuario)
+            .filter(NotificacionUsuario.request_id == notificacion.request_id)
+            .first()
+            if notificacion.request_id is not None
+            else None
+        )
+        if notificacion_existente:
+            complete_idempotency("notifications", event_id, {"event_type": event_type})
             return
 
         db.add(notificacion)
@@ -94,9 +148,10 @@ def crear_notificacion_desde_evento(mensaje: dict):
             )
         )
         db.commit()
-        print(f"Notificación guardada por evento {event_type}")
+        complete_idempotency("notifications", event_id, {"event_type": event_type})
     except Exception:
         db.rollback()
+        fail_idempotency("notifications", event_id)
         raise
     finally:
         db.close()
@@ -108,10 +163,9 @@ def manejar_mensaje(ch, method, properties, body):
         crear_notificacion_desde_evento(mensaje)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except (json.JSONDecodeError, ValueError) as error:
-        print(f"Evento de notificación mal formado: {error}")
+        logger.warning("Evento de notificación mal formado: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
     except Exception as error:
-        print(f"No se pudo procesar evento de notificación: {error}")
         logger.warning("No se pudo procesar evento de notificación: %s", error)
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
@@ -143,9 +197,10 @@ def iniciar_consumidor():
                 on_message_callback=manejar_mensaje,
             )
 
-            print("Consumidor RabbitMQ de notifications iniciado")
+            logger.info("Consumidor RabbitMQ de notifications iniciado")
             canal.start_consuming()
         except Exception as error:
-            print(f"No se pudo iniciar consumidor RabbitMQ de notifications: {error}")
-            logger.warning("No se pudo iniciar consumidor RabbitMQ de notifications: %s", error)
+            logger.warning(
+                "No se pudo iniciar consumidor RabbitMQ de notifications: %s", error
+            )
             time.sleep(5)

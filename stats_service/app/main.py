@@ -8,7 +8,7 @@ from fastapi import Header
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models  # noqa: F401
 from app.db import Base
 from app.db import SessionLocal
 from app.db import engine
@@ -52,7 +52,9 @@ def obtener_id_usuario(authorization: str | None = Header(default=None)):
             timeout=20.0,
         )
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=503, detail="No fue posible validar la autorización") from exc
+        raise HTTPException(
+            status_code=503, detail="No fue posible validar la autorización"
+        ) from exc
 
     if response.status_code != 200:
         raise HTTPException(status_code=401, detail="Usuario no autenticado")

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: str | None = None
+    internal_service_token: str | None = None
 
     @property
     def database_url(self) -> URL:

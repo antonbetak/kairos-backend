@@ -22,7 +22,9 @@ def _parse_datetime(value: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(value)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Formato de fecha invalido.") from exc
+        raise HTTPException(
+            status_code=400, detail="Formato de fecha invalido."
+        ) from exc
 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)

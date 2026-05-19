@@ -1,7 +1,13 @@
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 
-from app.schemas import GoogleAuthResponse, GoogleMeResponse, GoogleRefreshRequest, GoogleRefreshResponse
+from app.schemas import (
+    GoogleAuthResponse,
+    GoogleAuthUrlResponse,
+    GoogleMeResponse,
+    GoogleRefreshRequest,
+    GoogleRefreshResponse,
+)
 from app.services.google_oauth import GoogleOAuthService, get_google_oauth_service
 
 
@@ -25,6 +31,18 @@ def _extract_bearer_token(authorization: str | None) -> str:
     return parts[1]
 
 
+@router.get(
+    "/auth-url",
+    response_model=GoogleAuthUrlResponse,
+    summary="Get Google authentication URL",
+)
+async def get_google_auth_url(
+    oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
+) -> GoogleAuthUrlResponse:
+    authorization_url = oauth_service.build_authorization_url()
+    return GoogleAuthUrlResponse(url=authorization_url)
+
+
 @router.get("/login", summary="Start Google authentication")
 async def start_google_login(
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),
@@ -33,7 +51,9 @@ async def start_google_login(
     return RedirectResponse(url=authorization_url, status_code=307)
 
 
-@router.get("/callback", response_model=GoogleAuthResponse, summary="Google OAuth callback")
+@router.get(
+    "/callback", response_model=GoogleAuthResponse, summary="Google OAuth callback"
+)
 async def google_callback(
     code: str = Query(..., description="Authorization code returned by Google"),
     state: str = Query(..., description="Signed state generated at login time"),
@@ -42,7 +62,11 @@ async def google_callback(
     return await oauth_service.authenticate(code=code, state=state)
 
 
-@router.post("/refresh", response_model=GoogleRefreshResponse, summary="Refresh Google access token")
+@router.post(
+    "/refresh",
+    response_model=GoogleRefreshResponse,
+    summary="Refresh Google access token",
+)
 async def refresh_google_token(
     payload: GoogleRefreshRequest,
     oauth_service: GoogleOAuthService = Depends(get_google_oauth_service),

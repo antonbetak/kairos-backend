@@ -27,7 +27,9 @@ def get_calendar_service() -> GoogleCalendarService:
     return GoogleCalendarService(settings)
 
 
-@router.get("/calendars", response_model=CalendarListResponse, summary="List user calendars")
+@router.get(
+    "/calendars", response_model=CalendarListResponse, summary="List user calendars"
+)
 @require_google_login
 async def list_calendars(
     auth: AuthContext = Depends(require_auth),
@@ -71,7 +73,12 @@ async def list_events(
     return EventsListResponse.model_validate(data)
 
 
-@router.post("/events", response_model=EventItem, status_code=status.HTTP_201_CREATED, summary="Create event")
+@router.post(
+    "/events",
+    response_model=EventItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create event",
+)
 @require_google_login
 async def create_event(
     payload: CreateEventRequest,
@@ -142,7 +149,9 @@ async def update_event(
     return EventItem.model_validate(data)
 
 
-@router.delete("/events/{event_id}", response_model=DeleteResponse, summary="Delete event")
+@router.delete(
+    "/events/{event_id}", response_model=DeleteResponse, summary="Delete event"
+)
 @require_google_login
 async def delete_event(
     event_id: str,
@@ -154,7 +163,11 @@ async def delete_event(
     return DeleteResponse(status="ok", deleted=True)
 
 
-@router.post("/refresh", response_model=GoogleRefreshResponse, summary="Refresh Google access token")
+@router.post(
+    "/refresh",
+    response_model=GoogleRefreshResponse,
+    summary="Refresh Google access token",
+)
 async def refresh_google_token(
     payload: GoogleRefreshRequest,
     auth: AuthContext = Depends(require_auth),
@@ -162,5 +175,3 @@ async def refresh_google_token(
 ) -> GoogleRefreshResponse:
     tokens = await service.refresh_tokens(payload.refresh_token)
     return GoogleRefreshResponse(tokens=tokens)
-
-

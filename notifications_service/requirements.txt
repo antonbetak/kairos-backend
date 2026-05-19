@@ -5,3 +5,4 @@ SQLAlchemy
 psycopg2-binary
 pydantic-settings
 pika
+redis>=5.0,<6.0

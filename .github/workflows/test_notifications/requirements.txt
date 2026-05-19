@@ -1,0 +1,1 @@
+-r ../../../notifications_service/requirements.txt

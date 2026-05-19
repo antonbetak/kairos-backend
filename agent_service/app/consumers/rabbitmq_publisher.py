@@ -14,4 +14,6 @@ def publish_recommendation_requested(
     titulo: str,
     mensaje: str,
 ) -> None:
-    raise NotImplementedError("Lógica RAG pendiente para publicación de recomendaciones")
+    raise NotImplementedError(
+        "Lógica RAG pendiente para publicación de recomendaciones"
+    )
