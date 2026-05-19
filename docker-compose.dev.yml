@@ -43,3 +43,36 @@ services:
       - ./googlefit_service:/app
     command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: on-failure
+
+  agent_service:
+    build:
+      context: ./agent_service
+    env_file: .env.dev
+    expose:
+      - "8000"
+    volumes:
+      - ./agent_service:/app
+    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: on-failure
+    depends_on:
+      - rabbitmq
+      - chromadb
+
+  chromadb:
+    image: chromadb/chroma:latest
+    expose:
+      - "8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    restart: on-failure
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    expose:
+      - "5672"
+    ports:
+      - "15672:15672"
+    restart: on-failure
+
+volumes:
+  chroma_data:
