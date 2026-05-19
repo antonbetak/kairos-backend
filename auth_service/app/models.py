@@ -22,6 +22,13 @@ class User(Base):
     email: Mapped[str] = mapped_column(
         String(255), unique=True, index=True, nullable=False
     )
+    clerk_id: Mapped[str | None] = mapped_column(
+        String(120), unique=True, index=True, nullable=True
+    )
+    handle: Mapped[str | None] = mapped_column(
+        String(60), unique=True, index=True, nullable=True
+    )
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True),
