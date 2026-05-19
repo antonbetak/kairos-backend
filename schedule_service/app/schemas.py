@@ -1,8 +1,10 @@
+from datetime import date
 from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 
 
 class ScheduleCreate(BaseModel):
@@ -23,6 +25,12 @@ class ScheduleUpdate(BaseModel):
     tipo: str | None = None
     status: str | None = None
     request_id: UUID | None = None
+
+
+class ScheduleGenerateRequest(BaseModel):
+    fecha: date
+    metas: list[dict] = Field(default_factory=list)
+    streaks: list[dict] = Field(default_factory=list)
 
 
 class ScheduleResponse(BaseModel):

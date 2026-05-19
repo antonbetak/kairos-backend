@@ -324,6 +324,9 @@ services:
       SCHEDULE_DB_HOST: schedule_postgres
       SCHEDULE_DB_PORT: ${SCHEDULE_DB_PORT:-5432}
       SCHEDULE_DB_NAME: ${SCHEDULE_DB_NAME:-kairos_schedule_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_service:8000}
+      TASK_SERVICE_URL: ${TASK_SERVICE_URL:-http://task_service:8000}
+      AGENT_SERVICE_URL: ${AGENT_SERVICE_URL:-http://agent_service:8000}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
