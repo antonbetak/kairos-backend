@@ -16,6 +16,8 @@ services:
         condition: service_started
       notifications_service:
         condition: service_started
+      activity_service:
+        condition: service_started
     networks:
       - kairos-network
 

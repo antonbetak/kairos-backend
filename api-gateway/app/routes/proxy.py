@@ -29,6 +29,8 @@ def _service_url(service: str) -> str:
         "stats_service": settings.stats_service_url,
         "agent": settings.agent_service_url,
         "agent_service": settings.agent_service_url,
+        "activity": settings.activity_service_url,
+        "activity_service": settings.activity_service_url,
         "schedule": settings.schedule_service_url,
         "schedule_service": settings.schedule_service_url,
         "task": settings.task_service_url,
@@ -159,12 +161,42 @@ async def proxy_auth_me(request: Request):
     )
 
 
+@router.patch("/auth/me/profile")
+async def proxy_auth_profile(request: Request):
+    return await proxy_request(
+        request,
+        base_url=settings.auth_service_url,
+        path="/auth/me/profile",
+        timeout=settings.request_timeout_seconds,
+    )
+
+
 @router.get("/auth/verify")
 async def proxy_auth_verify(request: Request):
     return await proxy_request(
         request,
         base_url=settings.auth_service_url,
         path="/auth/verify",
+        timeout=settings.request_timeout_seconds,
+    )
+
+
+@router.get("/auth/users/search")
+async def proxy_auth_user_search(request: Request):
+    return await proxy_request(
+        request,
+        base_url=settings.auth_service_url,
+        path="/auth/users/search",
+        timeout=settings.request_timeout_seconds,
+    )
+
+
+@router.get("/auth/users/{id_usuario}/public")
+async def proxy_auth_public_profile(id_usuario: str, request: Request):
+    return await proxy_request(
+        request,
+        base_url=settings.auth_service_url,
+        path=f"/auth/users/{id_usuario}/public",
         timeout=settings.request_timeout_seconds,
     )
 
@@ -195,6 +227,16 @@ async def proxy_stats(path: str, request: Request):
         request,
         base_url=settings.stats_service_url,
         path=f"/{path}",
+        timeout=settings.request_timeout_seconds,
+    )
+
+
+@router.api_route("/activity/{path:path}", methods=_ALL_METHODS)
+async def proxy_activity(path: str, request: Request):
+    return await proxy_request(
+        request,
+        base_url=settings.activity_service_url,
+        path=f"/activity/{path}",
         timeout=settings.request_timeout_seconds,
     )
 
