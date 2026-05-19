@@ -471,6 +471,100 @@ Nota: `POST /notificaciones/interna` existe en `notifications_service`, pero no 
 
 ---
 
+**9) Thunder Client - Activity Service**
+
+Base URL del gateway:
+
+```text
+http://localhost:8000
+```
+
+9.1) POST /activity/friends/request
+
+- Descripcion: el usuario autenticado envia una solicitud de amistad a otro usuario.
+- Header obligatorio: `Authorization: Bearer <JWT_USUARIO_1>`
+
+Body:
+
+```json
+{
+  "addressee_id": "<ID_USUARIO_2>"
+}
+```
+
+Link:
+
+```text
+http://localhost:8000/activity/friends/request
+```
+
+Resultado esperado: `200 OK` con `requester_id` igual al usuario 1, `addressee_id` igual al usuario 2 y `status: "pending"`.
+
+Evidencia requerida: captura de Thunder Client guardada como `docs/img/mandar_solicitud.png`.
+
+![Mandar solicitud](img/mandar_solicitud.png)
+
+9.2) GET /activity/friends
+
+- Descripcion: lista las solicitudes y amistades del usuario autenticado.
+- Header obligatorio: `Authorization: Bearer <JWT_USUARIO_2>`
+
+Link:
+
+```text
+http://localhost:8000/activity/friends
+```
+
+Resultado esperado: `200 OK` con la solicitud recibida por el usuario 2 en `status: "pending"`.
+
+Evidencia requerida: captura de Thunder Client guardada como `docs/img/ver_solicitud.png`.
+
+![Ver solicitud recibida](img/ver_solicitud.png)
+
+9.3) POST /activity/friends/{friendship_id}/accept
+
+- Descripcion: el usuario destinatario acepta la solicitud de amistad.
+- Header obligatorio: `Authorization: Bearer <JWT_USUARIO_2>`
+- Body: no requiere body.
+
+Link:
+
+```text
+http://localhost:8000/activity/friends/<FRIENDSHIP_ID>/accept
+```
+
+Resultado esperado: `200 OK` con la relacion actualizada a `status: "accepted"`.
+
+Evidencia requerida: captura de Thunder Client guardada como `docs/img/aceptar_solicitud.png`.
+
+![Aceptar solicitud](img/aceptar_solicitud.png)
+
+9.4) GET /activity/friends
+
+- Descripcion: confirma que la amistad quedo aceptada.
+- Header obligatorio: `Authorization: Bearer <JWT_USUARIO_1>` o `Authorization: Bearer <JWT_USUARIO_2>`
+
+Link:
+
+```text
+http://localhost:8000/activity/friends
+```
+
+Resultado esperado: `200 OK` con la relacion en `status: "accepted"` visible para los usuarios involucrados.
+
+Evidencia requerida: captura de Thunder Client guardada como `docs/img/ver_solicitud_aceptada.png`.
+
+![Ver solicitud aceptada](img/ver_solicitud_aceptada.png)
+
+Capturas requeridas para este flujo:
+
+- `docs/img/mandar_solicitud.png`
+- `docs/img/ver_solicitud.png`
+- `docs/img/aceptar_solicitud.png`
+- `docs/img/ver_solicitud_aceptada.png`
+
+---
+
 **Bodies rápidos para copiar en Thunder Client**
 
 - `POST /tasks`
