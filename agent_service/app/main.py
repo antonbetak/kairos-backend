@@ -1,66 +1,45 @@
-from datetime import datetime
-from datetime import time
-from datetime import timedelta
+import logging
+from contextlib import asynccontextmanager
+from threading import Thread
 
 from fastapi import FastAPI
 
-from app.schemas import GeneratedBlock
-from app.schemas import GenerateRequest
-from app.schemas import GenerateResponse
+from app.consumers.rabbitmq_consumer import iniciar_consumidor
+from app.db.chroma import get_collection
+from app.routes.generate import router as generate_router
 
-app = FastAPI(title="Kairos Agent Service")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Iniciando agent-service...")
+
+    try:
+        get_collection()
+        logger.info("ChromaDB listo")
+    except Exception as e:
+        logger.warning("ChromaDB no disponible al inicio: %s", e)
+
+    thread = Thread(target=iniciar_consumidor, daemon=True)
+    thread.start()
+    logger.info("Consumidor RabbitMQ arrancado en background")
+
+    yield
+
+    logger.info("Cerrando agent-service...")
+
+
+app = FastAPI(
+    title="Kairos Agent Service",
+    description="Agente RAG para generación inteligente de horarios",
+    lifespan=lifespan,
+)
+
+app.include_router(generate_router)
 
 
 @app.get("/health")
 def health():
-    return {"service": "agent_service", "status": "ok"}
-
-
-@app.post("/generate", response_model=GenerateResponse)
-def generate_schedule(request: GenerateRequest):
-    inicio = datetime.combine(request.fecha, time(hour=9))
-    bloques: list[GeneratedBlock] = []
-
-    tareas = sorted(
-        request.tareas,
-        key=lambda tarea: (
-            tarea.fecha_limite is None,
-            tarea.fecha_limite.isoformat() if tarea.fecha_limite else "",
-            tarea.prioridad,
-        ),
-    )
-
-    for tarea in tareas[:4]:
-        duracion = max(30, min(tarea.duracion_estimada_min or 60, 180))
-        fin = inicio + timedelta(minutes=duracion)
-        bloques.append(
-            GeneratedBlock(
-                titulo=tarea.titulo,
-                descripcion=None,
-                fecha_inicio=inicio,
-                fecha_fin=fin,
-                tipo=tarea.tipo or "tarea",
-                razon="Bloque generado a partir de tareas activas",
-            )
-        )
-        inicio = fin + timedelta(minutes=15)
-
-    if not bloques:
-        fin = inicio + timedelta(minutes=45)
-        bloques.append(
-            GeneratedBlock(
-                titulo="Planificar el dia",
-                descripcion="Revisar prioridades y preparar el siguiente bloque",
-                fecha_inicio=inicio,
-                fecha_fin=fin,
-                tipo="planificacion",
-                razon="No habia tareas activas suficientes para generar un horario",
-            )
-        )
-
-    return GenerateResponse(
-        id_usuario=request.id_usuario,
-        fecha=request.fecha,
-        es_fallback=not bool(request.tareas),
-        bloques=bloques,
-    )
+    return {"service": "agent-service", "status": "ok"}
