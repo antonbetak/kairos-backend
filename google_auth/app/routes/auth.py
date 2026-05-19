@@ -43,7 +43,7 @@ def _extract_bearer_token(authorization: str | None) -> str:
     response_model=GoogleAuthUrlResponse,
     summary="Get Google authentication URL",
 )
-async def get_google_auth_url(
+sync def get_google_auth_url(
     platform: str | None = Query(
         default=None,
         description="Client platform (web, android, ios).",

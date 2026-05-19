@@ -28,6 +28,7 @@ from app.services.rabbitmq_publisher import publicar_tarea_abandonada
 from app.services.rabbitmq_publisher import publicar_tarea_completada
 from app.services.rabbitmq_publisher import publicar_tarea_creada
 from app.services.rabbitmq_publisher import publicar_tarea_error
+from app.services.rabbitmq_publisher import publicar_tarea_no_completada
 from app.services.due_warning import iniciar_verificador_vencimientos
 
 app = FastAPI(title="Kairos Task Service")
@@ -38,6 +39,12 @@ def _ensure_request_id_column() -> None:
     with engine.begin() as connection:
         connection.exec_driver_sql(
             "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS request_id UUID"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS due_at TIMESTAMPTZ"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS due_warning_sent_at TIMESTAMPTZ"
         )
         connection.exec_driver_sql(
             "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS due_expired_sent_at TIMESTAMPTZ"
@@ -292,6 +299,12 @@ def actualizar_tarea(
 
     if not estaba_completada and tarea.completada:
         publicar_tarea_completada(
+            id_usuario,
+            str(tarea.id_tarea),
+            tarea.titulo,
+        )
+    elif estaba_completada and not tarea.completada:
+        publicar_tarea_no_completada(
             id_usuario,
             str(tarea.id_tarea),
             tarea.titulo,

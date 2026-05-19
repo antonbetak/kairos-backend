@@ -111,7 +111,10 @@ def crear_notificacion_desde_evento(mensaje: dict):
         request_id=_safe_uuid(mensaje.get("request_id")) or uuid4(),
         id_usuario=user_id_for_notification,
         titulo=mensaje.get("titulo") or titulo_default,
-        mensaje=mensaje.get("mensaje") or mensaje.get("descripcion") or mensaje.get("error") or mensaje_default,
+        mensaje=mensaje.get("mensaje")
+        or mensaje.get("descripcion")
+        or mensaje.get("error")
+        or mensaje_default,
         tipo=mensaje.get("tipo") or tipo_default,
     )
 

@@ -49,7 +49,11 @@ def _message_for_event(event: dict) -> tuple[str, str, str]:
         message = description or "Actualizó su racha"
         return ("streak_updated", streak_title, message)
 
-    return ("activity_event", title or "Nueva actividad", description or "Nueva actividad en Kairos")
+    return (
+        "activity_event",
+        title or "Nueva actividad",
+        description or "Nueva actividad en Kairos",
+    )
 
 
 def create_event_from_domain_event(db: Session, event: dict) -> ActivityEvent | None:

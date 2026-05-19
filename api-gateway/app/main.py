@@ -17,11 +17,14 @@ from app.services.notifications_client import crear_notificacion
 from app.services.notifications_client import listar_notificaciones
 from app.services.notifications_client import marcar_notificacion_leida
 from app.services.notifications_client import marcar_todas_notificaciones_leidas
+from app.services.schedule_client import aceptar_horario
 from app.services.schedule_client import actualizar_horario
 from app.services.schedule_client import crear_horario
 from app.services.schedule_client import eliminar_horario
+from app.services.schedule_client import generar_horario
 from app.services.schedule_client import listar_horarios
 from app.services.schedule_client import obtener_horario
+from app.services.schedule_client import rechazar_horario
 from app.services.stats_client import listar_logros
 from app.services.stats_client import obtener_estadisticas
 from app.services.stats_client import obtener_racha
@@ -61,6 +64,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/", include_in_schema=False)
 async def root() -> dict[str, str]:
@@ -146,41 +150,75 @@ async def eliminar_tarea_por_id(
 
 
 @app.post("/schedule")
-async def crear_nuevo_horario(datos: dict, usuario=Depends(obtener_usuario_actual)):
-    id_usuario = usuario["id_usuario"]
-    return await crear_horario(id_usuario, datos)
+async def crear_nuevo_horario(
+    datos: dict,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    return await crear_horario(authorization, datos)
+
+
+@app.post("/schedule/generate")
+async def generar_horario_propuesto(
+    datos: dict,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    return await generar_horario(authorization, datos)
 
 
 @app.get("/schedule")
-async def obtener_horarios(usuario=Depends(obtener_usuario_actual)):
-    id_usuario = usuario["id_usuario"]
-    return await listar_horarios(id_usuario)
+async def obtener_horarios(
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    return await listar_horarios(authorization)
 
 
 @app.get("/schedule/{schedule_id}")
 async def obtener_horario_por_id(
-    schedule_id: str, usuario=Depends(obtener_usuario_actual)
+    schedule_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
 ):
-    id_usuario = usuario["id_usuario"]
-    return await obtener_horario(id_usuario, schedule_id)
+    return await obtener_horario(authorization, schedule_id)
 
 
 @app.patch("/schedule/{schedule_id}")
 async def actualizar_horario_por_id(
     schedule_id: str,
     datos: dict,
+    authorization: str | None = Header(default=None),
     usuario=Depends(obtener_usuario_actual),
 ):
-    id_usuario = usuario["id_usuario"]
-    return await actualizar_horario(id_usuario, schedule_id, datos)
+    return await actualizar_horario(authorization, schedule_id, datos)
+
+
+@app.patch("/schedule/{schedule_id}/accept")
+async def aceptar_horario_por_id(
+    schedule_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    return await aceptar_horario(authorization, schedule_id)
+
+
+@app.delete("/schedule/{schedule_id}/reject")
+async def rechazar_horario_por_id(
+    schedule_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
+):
+    return await rechazar_horario(authorization, schedule_id)
 
 
 @app.delete("/schedule/{schedule_id}")
 async def eliminar_horario_por_id(
-    schedule_id: str, usuario=Depends(obtener_usuario_actual)
+    schedule_id: str,
+    authorization: str | None = Header(default=None),
+    usuario=Depends(obtener_usuario_actual),
 ):
-    id_usuario = usuario["id_usuario"]
-    return await eliminar_horario(id_usuario, schedule_id)
+    return await eliminar_horario(authorization, schedule_id)
 
 
 @app.get("/estadisticas")

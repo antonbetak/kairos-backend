@@ -75,5 +75,7 @@ def start_consumer():
             logger.info("Consumidor RabbitMQ de activity iniciado")
             channel.start_consuming()
         except Exception as error:
-            logger.warning("No se pudo iniciar consumidor RabbitMQ de activity: %s", error)
+            logger.warning(
+                "No se pudo iniciar consumidor RabbitMQ de activity: %s", error
+            )
             time.sleep(5)

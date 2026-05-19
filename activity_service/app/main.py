@@ -154,7 +154,9 @@ def create_activity_event(
     return event
 
 
-@app.patch("/activity/events/{event_id}/visibility", response_model=ActivityEventResponse)
+@app.patch(
+    "/activity/events/{event_id}/visibility", response_model=ActivityEventResponse
+)
 def update_visibility(
     event_id: UUID,
     payload: VisibilityUpdate,

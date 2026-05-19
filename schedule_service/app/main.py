@@ -19,6 +19,7 @@ from app.database import Base
 from app.database import SessionLocal
 from app.database import engine
 from app.schemas import ScheduleCreate
+from app.schemas import ScheduleGenerateRequest
 from app.schemas import ScheduleResponse
 from app.schemas import ScheduleUpdate
 from app.services.idempotency import complete as complete_idempotency
@@ -121,6 +122,72 @@ def obtener_token_google(
             raise HTTPException(status_code=401, detail="Token de Google invalidado")
 
     return x_google_token, x_google_refresh
+
+
+def _authorization_header(authorization: str | None) -> dict[str, str]:
+    token = _extract_bearer_token(authorization)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _task_to_agent_context(task: dict) -> dict:
+    return {
+        "id": str(task.get("id_tarea") or task.get("id") or ""),
+        "titulo": task.get("titulo") or "Tarea sin titulo",
+        "tipo": "tarea",
+        "prioridad": task.get("prioridad") or "media",
+        "fecha_limite": task.get("due_at"),
+        "duracion_estimada_min": task.get("duracion_estimada_min") or 60,
+    }
+
+
+async def _listar_tareas_activas(authorization: str | None) -> list[dict]:
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
+            response = await client.get(
+                f"{settings.task_service_url.rstrip('/')}/tasks",
+                headers=_authorization_header(authorization),
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=503, detail="No fue posible consultar tareas"
+        ) from exc
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail="Task service no pudo entregar el contexto del usuario",
+        )
+
+    return [
+        _task_to_agent_context(task)
+        for task in response.json()
+        if not task.get("completada")
+    ]
+
+
+async def _generar_bloques_con_agente(payload: dict) -> list[dict]:
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
+            response = await client.post(
+                f"{settings.agent_service_url.rstrip('/')}/generate",
+                json=payload,
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=503, detail="No fue posible conectar con agent-service"
+        ) from exc
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=502,
+            detail="Agent service no pudo generar bloques",
+        )
+
+    return response.json().get("bloques") or []
 
 
 @app.on_event("startup")
@@ -252,6 +319,65 @@ def crear_bloque(
     return bloque
 
 
+@app.post("/schedule/generate", response_model=list[ScheduleResponse])
+async def generar_bloques_propuestos(
+    datos: ScheduleGenerateRequest,
+    authorization: str | None = Header(default=None),
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    tareas = await _listar_tareas_activas(authorization)
+    agent_payload = {
+        "id_usuario": str(id_usuario),
+        "fecha": datos.fecha.isoformat(),
+        "tareas": tareas,
+        "metas": datos.metas,
+        "streaks": datos.streaks,
+    }
+    bloques_generados = await _generar_bloques_con_agente(agent_payload)
+
+    db.query(models.ScheduleBlock).filter(
+        models.ScheduleBlock.id_usuario == id_usuario,
+        models.ScheduleBlock.status == "propuesto",
+    ).delete(synchronize_session=False)
+
+    bloques: list[models.ScheduleBlock] = []
+    for item in bloques_generados:
+        fecha_inicio = datetime.fromisoformat(str(item["fecha_inicio"]))
+        fecha_fin = datetime.fromisoformat(str(item["fecha_fin"]))
+        if fecha_fin <= fecha_inicio:
+            raise HTTPException(
+                status_code=502,
+                detail="Agent service devolvio un bloque con fechas invalidas",
+            )
+
+        bloque = models.ScheduleBlock(
+            id_usuario=id_usuario,
+            titulo=item.get("titulo") or "Bloque propuesto",
+            descripcion=item.get("descripcion"),
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            tipo=item.get("tipo"),
+            status="propuesto",
+        )
+        db.add(bloque)
+        bloques.append(bloque)
+
+    db.commit()
+    for bloque in bloques:
+        db.refresh(bloque)
+
+    _log_event(
+        "SCHEDULE_GENERATED",
+        "SUCCESS",
+        "Bloques propuestos generados correctamente",
+        user_id=str(id_usuario),
+        slots_generated=len(bloques),
+    )
+
+    return bloques
+
+
 @app.get("/schedule", response_model=list[ScheduleResponse])
 def listar_bloques(
     id_usuario: UUID = Depends(obtener_id_usuario),
@@ -284,6 +410,70 @@ def obtener_bloque(
         raise HTTPException(status_code=404, detail="Bloque no encontrado")
 
     return bloque
+
+
+@app.patch("/schedule/{schedule_id}/accept", response_model=ScheduleResponse)
+def aceptar_bloque_propuesto(
+    schedule_id: UUID,
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    bloque = (
+        db.query(models.ScheduleBlock)
+        .filter(models.ScheduleBlock.id == schedule_id)
+        .filter(models.ScheduleBlock.id_usuario == id_usuario)
+        .filter(models.ScheduleBlock.status == "propuesto")
+        .first()
+    )
+
+    if not bloque:
+        raise HTTPException(
+            status_code=404, detail="Bloque no encontrado o ya procesado"
+        )
+
+    bloque.status = "planned"
+    bloque.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(bloque)
+
+    publicar_horario_actualizado(
+        str(id_usuario),
+        str(bloque.id),
+        str(bloque.request_id or uuid4()),
+        bloque.titulo,
+        bloque.descripcion,
+        bloque.fecha_inicio.isoformat(),
+        bloque.fecha_fin.isoformat(),
+        bloque.tipo,
+        bloque.status,
+    )
+
+    return bloque
+
+
+@app.delete("/schedule/{schedule_id}/reject")
+def rechazar_bloque_propuesto(
+    schedule_id: UUID,
+    id_usuario: UUID = Depends(obtener_id_usuario),
+    db: Session = Depends(get_db),
+):
+    bloque = (
+        db.query(models.ScheduleBlock)
+        .filter(models.ScheduleBlock.id == schedule_id)
+        .filter(models.ScheduleBlock.id_usuario == id_usuario)
+        .filter(models.ScheduleBlock.status == "propuesto")
+        .first()
+    )
+
+    if not bloque:
+        raise HTTPException(
+            status_code=404, detail="Bloque no encontrado o ya procesado"
+        )
+
+    db.delete(bloque)
+    db.commit()
+
+    return {"detail": "Bloque rechazado y eliminado"}
 
 
 @app.patch("/schedule/{schedule_id}", response_model=ScheduleResponse)

@@ -53,7 +53,9 @@ async def _fetch_clerk_user(clerk_user_id: str) -> dict[str, Any] | None:
     url = f"https://api.clerk.com/v1/users/{clerk_user_id}"
     headers = {"Authorization": f"Bearer {settings.clerk_secret_key}"}
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
             response = await client.get(url, headers=headers)
     except httpx.RequestError:
         return None
@@ -132,12 +134,16 @@ async def _decode_clerk_token(token: str) -> dict[str, Any] | None:
     if not clerk_user_id:
         return None
 
-    email = str(
-        payload.get("email")
-        or payload.get("email_address")
-        or payload.get("primary_email_address")
-        or ""
-    ).strip().lower()
+    email = (
+        str(
+            payload.get("email")
+            or payload.get("email_address")
+            or payload.get("primary_email_address")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
     nombre = _full_name(payload)
     avatar_url = str(payload.get("image_url") or payload.get("picture") or "").strip()
 
@@ -146,9 +152,14 @@ async def _decode_clerk_token(token: str) -> dict[str, Any] | None:
         if clerk_user:
             email = email or (_primary_email_from_clerk_user(clerk_user) or "")
             nombre = nombre or _full_name(clerk_user)
-            avatar_url = avatar_url or str(
-                clerk_user.get("image_url") or clerk_user.get("profile_image_url") or ""
-            ).strip()
+            avatar_url = (
+                avatar_url
+                or str(
+                    clerk_user.get("image_url")
+                    or clerk_user.get("profile_image_url")
+                    or ""
+                ).strip()
+            )
 
     if not email:
         return None
@@ -168,7 +179,9 @@ async def _sync_clerk_user(profile: dict[str, Any]) -> dict[str, Any] | None:
         headers["X-Internal-Token"] = settings.internal_service_token
 
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
             response = await client.post(url, json=profile, headers=headers)
     except httpx.RequestError:
         return None
@@ -192,7 +205,9 @@ async def _sync_clerk_user(profile: dict[str, Any]) -> dict[str, Any] | None:
 async def _verify_legacy_kairos_token(token: str) -> dict[str, Any] | None:
     url = f"{settings.auth_service_url.rstrip('/')}/auth/verify"
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
             response = await client.get(
                 url,
                 headers={"Authorization": f"Bearer {token}"},
