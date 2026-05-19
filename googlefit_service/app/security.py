@@ -23,64 +23,27 @@ class FitAuthContext(BaseModel):
     refreshed: bool = False
 
 
-async def _token_status(token: str) -> bool:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/token-status"
-    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
-        response = await client.post(url, json={"token": token})
-
-    if response.status_code >= 400:
+def _verify_gateway_token(internal_token: str | None) -> None:
+    if not settings.internal_service_token:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No fue posible validar el estado del token.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Token interno de servicio no configurado.",
         )
 
-    return bool(response.json().get("blacklisted"))
-
-
-async def _blacklist_token(token: str) -> None:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/token-blacklist"
-    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
-        response = await client.post(url, json={"token": token})
-
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No fue posible invalidar el token anterior.",
-        )
-
-
-async def _verify_internal_token(authorization: str) -> dict[str, Any]:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/verify"
-    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
-        response = await client.get(url, headers={"Authorization": authorization})
-
-    if response.status_code == 200:
-        return response.json()
-
-    if response.status_code == 401:
+    if not internal_token or internal_token != settings.internal_service_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="JWT invalido o expirado.",
+            detail="Se requiere X-Internal-Token válido.",
         )
 
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="No fue posible validar el JWT interno.",
-    )
 
-
-def _select_google_token(authorization: str | None, google_token: str | None) -> str:
+def _select_google_token(google_token: str | None) -> str:
     if google_token and str(google_token).strip():
         return str(google_token).strip()
 
-    if authorization:
-        parts = authorization.strip().split()
-        if len(parts) == 2 and parts[0].lower() == "bearer" and parts[1].strip():
-            return parts[1].strip()
-
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Se requiere Authorization o X-Google-Token.",
+        detail="Se requiere X-Google-Access-Token.",
     )
 
 
@@ -142,47 +105,44 @@ def _validate_scopes(token_scopes: str) -> list[str]:
 
 
 async def require_google_token(
-    authorization: str | None = Header(None, description="Bearer Google access_token"),
-    google_token: str | None = Header(
-        None, alias="X-Google-Token", description="Google access_token"
+    x_internal_token: str | None = Header(
+        None,
+        alias="X-Internal-Token",
+        description="Token interno enviado por el gateway",
     ),
-    google_refresh: str | None = Header(None, alias="X-Google-Refresh"),
+    google_token: str | None = Header(
+        None,
+        alias="X-Google-Access-Token",
+        description="Google access token interno",
+    ),
+    google_refresh: str | None = Header(
+        None,
+        alias="X-Google-Refresh-Token",
+    ),
 ) -> FitAuthContext:
     logger.info(
-        "Fit require_google_token headers authorization=%s x-google-token=%s x-google-refresh=%s",
-        authorization,
+        "Fit require_google_token headers x-internal-token=%s x-google-access-token=%s x-google-refresh-token=%s",
+        bool(x_internal_token),
         google_token,
         google_refresh,
     )
-    access_token = _select_google_token(authorization, google_token)
-    refreshed = False
-    kairos_user_id: str | None = None
 
-    if authorization and google_token and str(google_token).strip():
-        jwt_token = authorization
-        if await _token_status(_select_google_token(jwt_token, None)):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT invalidado.",
-            )
-        payload = await _verify_internal_token(authorization)
-        kairos_user_id = (
-            str(payload.get("id_usuario") or payload.get("sub") or "").strip() or None
-        )
+    _verify_gateway_token(x_internal_token)
 
-    if await _token_status(access_token):
-        logger.info("Fit require_google_token token invalidated: %s", access_token)
+    if not google_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de Google invalidado.",
+            detail="Se requiere X-Google-Access-Token.",
         )
+
+    access_token = _select_google_token(google_token)
+    refreshed = False
 
     try:
         token_info = await _tokeninfo(access_token)
     except HTTPException:
         if not google_refresh:
             raise
-        await _blacklist_token(access_token)
         access_token = await _refresh_access_token(google_refresh)
         token_info = await _tokeninfo(access_token)
         refreshed = True
@@ -210,7 +170,7 @@ async def require_google_token(
     scopes = _validate_scopes(str(token_info.get("scope") or ""))
 
     return FitAuthContext(
-        user_id=kairos_user_id or user_id,
+        user_id=user_id,
         access_token=access_token,
         scopes=scopes,
         expires_in=expires_in_value,
@@ -231,7 +191,7 @@ def require_google_login(func):
         if not auth or not auth.access_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Debe iniciar sesion con Google (X-Google-Token).",
+                detail="Debe iniciar sesion con Google (X-Google-Access-Token).",
             )
 
         return await func(*args, **kwargs)

@@ -97,9 +97,16 @@ class ClerkGoogleTokenService:
             token_value = str(item.get("token") or "").strip()
             if not token_value:
                 continue
+            refresh_value = str(
+                item.get("refresh_token")
+                or item.get("refreshToken")
+                or item.get("refresh-token")
+                or ""
+            ).strip()
             tokens.append(
                 {
                     "token": token_value,
+                    "refresh_token": refresh_value or None,
                     "scopes": self._normalize_scopes(item.get("scopes") or []),
                 }
             )
@@ -126,18 +133,34 @@ class ClerkGoogleTokenService:
         required_scopes = set(self.settings.google_required_scopes_list())
         selected_token = None
         selected_scopes: list[str] = []
+        selected_refresh_token: str | None = None
 
-        for item in tokens:
-            token_scopes = set(item["scopes"])
-            if required_scopes and required_scopes.issubset(token_scopes):
-                selected_token = item["token"]
-                selected_scopes = item["scopes"]
-                break
+        selected: dict[str, object] | None = None
+        if tokens:
+            # Prefer a token with the required scopes and a refresh token.
+            for item in tokens:
+                token_scopes = set(item["scopes"])
+                if required_scopes and required_scopes.issubset(token_scopes):
+                    if item.get("refresh_token"):
+                        selected = item
+                        break
+                    if selected is None:
+                        selected = item
 
-        if selected_token is None:
-            selected = tokens[0]
+            # If no token with required scopes was found, choose the best available token.
+            if selected is None:
+                # Prefer tokens with refresh_token, then the token with the most scopes.
+                selected = max(
+                    tokens,
+                    key=lambda item: (
+                        bool(item.get("refresh_token")),
+                        len(set(item["scopes"])),
+                    ),
+                )
+
             selected_token = selected["token"]
             selected_scopes = selected["scopes"]
+            selected_refresh_token = selected.get("refresh_token")
 
         if required_scopes and not required_scopes.issubset(set(selected_scopes)):
             missing = sorted(required_scopes.difference(set(selected_scopes)))
@@ -161,6 +184,7 @@ class ClerkGoogleTokenService:
 
         result = {
             "access_token": selected_token,
+            "refresh_token": selected_refresh_token,
             "provider": "google",
             "scopes": selected_scopes,
         }

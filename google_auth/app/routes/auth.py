@@ -119,8 +119,6 @@ async def refresh_google_token(
         refresh_token=payload.refresh_token,
         platform=payload.platform,
     )
-    if payload.access_token:
-        await oauth_service.blacklist_access_token(payload.access_token)
     return GoogleRefreshResponse(tokens=tokens)
 
 

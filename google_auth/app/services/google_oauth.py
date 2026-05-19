@@ -39,28 +39,17 @@ class GoogleOAuthService:
         self._auth_sync_bus = AuthSyncBusClient(settings)
 
     async def _token_status(self, token: str) -> bool:
-        url = f"{self.settings.auth_service_url.rstrip('/')}/auth/token-status"
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(url, json={"token": token})
-
-        if response.status_code >= 400:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No fue posible validar el estado del token.",
-            )
-
-        return bool(response.json().get("blacklisted"))
+        logger.debug(
+            "Skipping auth_service token-status check for Google token: %s",
+            token,
+        )
+        return False
 
     async def _blacklist_token(self, token: str) -> None:
-        url = f"{self.settings.auth_service_url.rstrip('/')}/auth/token-blacklist"
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(url, json={"token": token})
-
-        if response.status_code >= 400:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No fue posible invalidar el token anterior.",
-            )
+        logger.debug(
+            "Skipping auth_service blacklist for Google token: %s",
+            token,
+        )
 
     def build_authorization_url(
         self,

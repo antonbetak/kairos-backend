@@ -97,52 +97,78 @@ async def proxy_google_auth(path: str, request: Request):
     )
 
 
-async def _build_proxy_headers(
-    request: Request, extra_headers: dict[str, str] | None = None
-) -> dict[str, str]:
-    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
-    if extra_headers:
-        headers.update(extra_headers)
-        if any(k.lower() == "x-google-token" for k in extra_headers):
-            headers.pop("authorization", None)
-            headers.pop("Authorization", None)
-    return headers
+_GOOGLE_ACCESS_TOKEN_HEADER = "X-Google-Access-Token"
+_GOOGLE_REFRESH_TOKEN_HEADER = "X-Google-Refresh-Token"
+_INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_LEGACY_GOOGLE_TOKEN_HEADERS = {"x-google-token", "x-google-access-token"}
+_LEGACY_GOOGLE_REFRESH_HEADERS = {"x-google-refresh", "x-google-refresh-token"}
 
 
-async def _try_fetch_google_header(
+def _extract_google_headers(request: Request) -> dict[str, str] | None:
+    headers: dict[str, str] = {}
+    token = (
+        request.headers.get(_GOOGLE_ACCESS_TOKEN_HEADER)
+        or request.headers.get("X-Google-Token")
+    )
+    refresh = (
+        request.headers.get(_GOOGLE_REFRESH_TOKEN_HEADER)
+        or request.headers.get("X-Google-Refresh")
+    )
+    if token:
+        headers[_GOOGLE_ACCESS_TOKEN_HEADER] = token
+    if refresh:
+        headers[_GOOGLE_REFRESH_TOKEN_HEADER] = refresh
+    return headers or None
+
+
+async def _require_clerk_user(authorization: str | None) -> dict[str, object]:
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization with Clerk JWT is required.",
+        )
+
+    user = await obtener_usuario_actual(authorization)
+    clerk_id = user.get("clerk_id")
+    if not clerk_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Clerk user could not be resolved from the provided token.",
+        )
+    return user
+
+
+async def _fetch_google_headers_for_clerk(
     authorization: str | None,
     clerk_service: ClerkGoogleTokenService,
-) -> dict[str, str] | None:
+) -> dict[str, str]:
     logger = logging.getLogger("api_gateway.proxy")
-    if not authorization:
-        logger.debug("No Authorization header present, skipping Clerk Google token lookup.")
-        return None
+    user = await _require_clerk_user(authorization)
+    clerk_id = user["clerk_id"]
 
     logger.debug("Attempting Clerk auth lookup from Authorization header.")
-    try:
-        usuario = await obtener_usuario_actual(authorization)
-    except HTTPException as exc:
-        logger.debug("Clerk auth lookup failed: %s", exc.detail if hasattr(exc, 'detail') else exc)
-        return None
-
-    clerk_id = usuario.get("clerk_id")
-    if not clerk_id:
-        logger.debug("Clerk auth lookup returned no clerk_id: %s", usuario)
-        return None
-
     token_data = await clerk_service.get_google_access_token(clerk_id)
 
     # Log injection event for testing
     try:
         logger.debug(
-            "Injecting X-Google-Token for clerk_id=%s token=%s",
+            "Injecting %s for clerk_id=%s token=%s refresh=%s",
+            _GOOGLE_ACCESS_TOKEN_HEADER,
             clerk_id,
             str(token_data.get("access_token")),
+            str(token_data.get("refresh_token")),
         )
     except Exception:
         pass
 
-    return {"X-Google-Token": str(token_data["access_token"])}
+    headers = {
+        _GOOGLE_ACCESS_TOKEN_HEADER: str(token_data["access_token"]),
+    }
+    refresh_token = token_data.get("refresh_token")
+    if refresh_token:
+        headers[_GOOGLE_REFRESH_TOKEN_HEADER] = str(refresh_token)
+
+    return headers
 
 
 @router.api_route("/google/{path:path}", methods=_ALL_METHODS)
@@ -152,9 +178,17 @@ async def proxy_calendar_google(
     authorization: str | None = Header(default=None),
     clerk_service: ClerkGoogleTokenService = Depends(get_clerk_google_token_service),
 ):
-    extra_headers = None
-    if "x-google-token" not in {k.lower() for k in request.headers.keys()}:
-        extra_headers = await _try_fetch_google_header(authorization, clerk_service)
+    google_headers = _extract_google_headers(request)
+    if google_headers is not None:
+        await _require_clerk_user(authorization)
+        extra_headers = google_headers
+    else:
+        extra_headers = await _fetch_google_headers_for_clerk(
+            authorization, clerk_service
+        )
+
+    if settings.internal_service_token:
+        extra_headers[_INTERNAL_TOKEN_HEADER] = settings.internal_service_token
 
     return await proxy_request(
         request,
@@ -182,9 +216,17 @@ async def proxy_fit(
     authorization: str | None = Header(default=None),
     clerk_service: ClerkGoogleTokenService = Depends(get_clerk_google_token_service),
 ):
-    extra_headers = None
-    if "x-google-token" not in {k.lower() for k in request.headers.keys()}:
-        extra_headers = await _try_fetch_google_header(authorization, clerk_service)
+    google_headers = _extract_google_headers(request)
+    if google_headers is not None:
+        await _require_clerk_user(authorization)
+        extra_headers = google_headers
+    else:
+        extra_headers = await _fetch_google_headers_for_clerk(
+            authorization, clerk_service
+        )
+
+    if settings.internal_service_token:
+        extra_headers[_INTERNAL_TOKEN_HEADER] = settings.internal_service_token
 
     return await proxy_request(
         request,
