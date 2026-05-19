@@ -68,7 +68,10 @@ class GoogleOAuthServiceUnitTests(unittest.IsolatedAsyncioTestCase):
         self.service = GoogleOAuthService(self.settings)
 
     def test_state_round_trip(self) -> None:
-        state = self.service._create_state()
+        state = self.service._create_state(
+            client_id="client-id",
+            redirect_uri="http://localhost/callback",
+        )
         payload = self.service._extract_state_payload(state)
 
         self.assertTrue(payload.nonce)
@@ -117,7 +120,10 @@ class GoogleOAuthServiceUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(profile.email_verified)
 
     async def test_authenticate_builds_user_and_token_payload(self) -> None:
-        state = self.service._create_state()
+        state = self.service._create_state(
+            client_id="client-id",
+            redirect_uri="http://localhost/callback",
+        )
         token_response = {
             "access_token": "access-token",
             "token_type": "Bearer",
@@ -144,6 +150,26 @@ class GoogleOAuthServiceUnitTests(unittest.IsolatedAsyncioTestCase):
                 return_value=claims,
             ),
             patch.object(self.service, "fetch_userinfo", AsyncMock(return_value={})),
+            patch.object(
+                self.service._auth_sync_bus,
+                "sync_google_user",
+                return_value=(
+                    {
+                        "id_usuario": "11111111-1111-1111-1111-111111111111",
+                        "nombre": "CI User",
+                        "email": "user@example.com",
+                        "handle": "ciuser",
+                        "avatar_url": "https://example.com/avatar.png",
+                    },
+                    {
+                        "access_token": "kairos-access",
+                        "refresh_token": "kairos-refresh",
+                        "token_type": "bearer",
+                        "expires_in": 3600,
+                        "refresh_expires_in": 7200,
+                    },
+                ),
+            ),
         ):
             response = await self.service.authenticate("authorization-code", state)
 
@@ -151,6 +177,8 @@ class GoogleOAuthServiceUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.user.email, "user@example.com")
         self.assertEqual(response.tokens.access_token, "access-token")
         self.assertEqual(response.tokens.refresh_token, "refresh-token")
+        self.assertEqual(response.kairos_user.email, "user@example.com")
+        self.assertEqual(response.kairos_tokens.access_token, "kairos-access")
 
 
 @unittest.skipUnless(RUN_E2E_TESTS, "E2E tests disabled")

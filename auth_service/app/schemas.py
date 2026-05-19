@@ -101,3 +101,15 @@ class VerifyTokenResponse(BaseModel):
     valid: bool
     id_usuario: UUID
     email: str
+
+
+class GoogleUserSync(BaseModel):
+    email: str
+    nombre: str
+    picture: str | None = None
+    google_id: str
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()

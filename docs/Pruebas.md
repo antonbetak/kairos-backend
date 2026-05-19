@@ -26,21 +26,20 @@ curl -X POST http://localhost:8000/auth/login \
 
 ## Prueba: crear tarea y sincronizar con Google Calendar
 
-1. Consigue un `X-Google-Token` válido (desde `google_auth` o consola Google OAuth playground).
-2. Crear tarea con headers `Authorization` y `X-Google-Token`:
+1. Inicia sesión con Clerk y mantén una sesión válida en el frontend.
+2. Crear tarea con solo el header `Authorization` (Clerk o JWT interno):
 
 ```bash
 curl -X POST http://localhost:8000/tasks \
-  -H "Authorization: Bearer <jwt>" \
-  -H "X-Google-Token: <access_token>" \
+  -H "Authorization: Bearer <token_de_sesion>" \
   -H "Content-Type: application/json" \
   -d '{"titulo":"Revisar informe","descripcion":"Pendiente de hoy","due_at":"2026-05-17T18:30:00Z"}'
 ```
 
 3. Evidencias:
   - Respuesta HTTP 200/201 con `id_tarea`.
-  - Log en `calendar_service` indicando intento de creación en Google.
-  - Evento creado en el calendario asociado al `X-Google-Token`.
+  - El gateway inyecta internamente el token de Google desde Clerk para Calendar/Fit.
+  - Evento creado en Google Calendar sin exponer el Google access token al frontend.
 
 ## Prueba: notificaciones por eventos
 
@@ -50,10 +49,10 @@ curl -X POST http://localhost:8000/tasks \
 
 ## Prueba: Google Calendar endpoints directos
 
-Ejecutar `GET /google/calendars` con `X-Google-Token` y verificar listado de calendarios.
+Ejecutar `GET /google/calendars` con una sesión válida de usuario; el gateway obtiene el token de Google desde Clerk.
 
 ```bash
-curl -H "X-Google-Token: <token>" http://localhost:8000/google/calendars
+curl -H "Authorization: Bearer <token_de_sesion>" http://localhost:8000/google/calendars
 ```
 
 ## Logs y DB
@@ -64,6 +63,24 @@ curl -H "X-Google-Token: <token>" http://localhost:8000/google/calendars
 ## Registro de evidencias
 
 - Guarda respuestas HTTP (JSON) y capturas de pantalla o exporta logs a ficheros para auditoría.
+
+## Prueba: login con Clerk + sync en Google Auth
+
+1. Iniciar sesion en app con Clerk (Google).
+2. Invocar `POST /auth/google/clerk/session` con payload `user` y `tokens` de Google.
+3. Verificar en la respuesta:
+  - Existe `kairos_user.id_usuario` (UUID).
+  - Existe `kairos_user.handle` autogenerado y unico.
+  - Existen `kairos_tokens.access_token` y `kairos_tokens.refresh_token`.
+
+## Prueba: Calendar/Fit con identidad Kairos
+
+1. Llamar `GET /google/calendars` y `GET /fit/me` con solo:
+  - `Authorization: Bearer <token_de_sesion>`
+2. Verificar resultados:
+  - Calendar devuelve calendarios/eventos del usuario Google autenticado.
+  - Fit devuelve métricas/sesiones sin error de permisos.
+3. Verificar en logs de servicios que el gateway obtuvo el token de Google desde Clerk y lo inyectó internamente.
 **Pruebas — Auth y Google Auth**
 
 Este documento recoge los ejemplos de petición (JSON) y descripción para los endpoints de `auth` y `google_auth`/`calendar_service` utilizados en el proyecto.
@@ -71,15 +88,15 @@ Este documento recoge los ejemplos de petición (JSON) y descripción para los e
 **Nota sobre las capturas:** Las capturas originales fueron provistas por el autor. Por seguridad se han retirado tokens y datos personales del contenido mostrado aquí. Si quieres incluir las imágenes en el repo, súbelas a `docs/images/` y reemplaza los marcadores de imagen por los nombres de fichero.
 
 **Cabeceras comunes**
-- **Authorization (JWT interno):** `Authorization: Bearer <JWT_INTERNO>`
-- **Google token (acceso):** `X-Google-Token: <ACCESS_TOKEN_GOOGLE>`
+- **Authorization (sesión o JWT interno):** `Authorization: Bearer <token_de_sesion>`
+- **Google token (acceso):** `X-Google-Token: <ACCESS_TOKEN_GOOGLE>` — solo para pruebas avanzadas o compatibilidad; el gateway puede inyectar el token de Google internamente.
 - **Google refresh (opcional):** `X-Google-Refresh: <REFRESH_TOKEN_GOOGLE>`
 
 ---
 
 **1) GET /auth/google/me**
 - Descripción: Devuelve información básica del usuario autenticado con Google (provider: google, user, etc.).
-- Headers: `Authorization: Bearer <ACCESS_TOKEN_GOOGLE>` (o `X-Google-Token`).
+- Headers: `Authorization: Bearer <token_de_sesion>`.
 - Respuesta (ejemplo sanitizado):
 
 ```json
@@ -98,7 +115,7 @@ Este documento recoge los ejemplos de petición (JSON) y descripción para los e
 Curl de ejemplo:
 
 ```bash
-curl -H "Authorization: Bearer <ACCESS_TOKEN_GOOGLE>" \
+curl -H "Authorization: Bearer <token_de_sesion>" \
   http://localhost:8000/auth/google/me
 ```
 
@@ -190,7 +207,7 @@ Respuesta (ejemplo):
 
 **6) Endpoints de Google Calendar (via `calendar_service`)**
 
-- Todos los endpoints de `google` requieren login con Google: usar `X-Google-Token` o `Authorization: Bearer <access_token_google>` y respetar `require_google_login` cuando corresponde.
+- Todos los endpoints de `google` requieren una sesión de usuario válida. El gateway puede obtener e inyectar el token de Google desde Clerk cuando el usuario está autenticado.
 
 6.1) POST /google/events — Crear evento
 
@@ -215,7 +232,7 @@ Curl de ejemplo:
 ```bash
 curl -X POST http://localhost:8000/google/events \
   -H "Content-Type: application/json" \
-  -H "X-Google-Token: <ACCESS_TOKEN_GOOGLE>" \
+  -H "Authorization: Bearer <token_de_sesion>" \
   -d '{...JSON above...}'
 ```
 
@@ -240,7 +257,7 @@ Curl:
 ```bash
 curl -X PUT http://localhost:8000/google/events/<EVENT_ID> \
   -H "Content-Type: application/json" \
-  -H "X-Google-Token: <ACCESS_TOKEN_GOOGLE>" \
+  -H "Authorization: Bearer <token_de_sesion>" \
   -d '{...JSON above...}'
 ```
 
@@ -252,7 +269,7 @@ Ejemplo:
 
 ```bash
 curl -X DELETE "http://localhost:8000/google/events/<EVENT_ID>?calendar_id=primary" \
-  -H "X-Google-Token: <ACCESS_TOKEN_GOOGLE>"
+  -H "Authorization: Bearer <token_de_sesion>"
 ```
 
 6.4) POST /google/refresh — Refrescar access token (calendar_service)
@@ -314,9 +331,9 @@ http://localhost:8000/tasks
 
 7.2) POST /tasks
 
-- Descripción: crea una tarea y, si mandas `X-Google-Token`, intenta publicar la sincronización con Google Calendar.
+- Descripción: crea una tarea y, si el usuario está autenticado, el gateway puede inyectar el token de Google para sincronizar con Google Calendar.
 - Headers obligatorios: `Authorization: Bearer <JWT_INTERNO>`
-- Headers opcionales: `X-Google-Token: <ACCESS_TOKEN_GOOGLE>`, `X-Google-Refresh: <REFRESH_TOKEN_GOOGLE>`
+- Headers opcionales: `X-Google-Refresh: <REFRESH_TOKEN_GOOGLE>`
 
 Body:
 

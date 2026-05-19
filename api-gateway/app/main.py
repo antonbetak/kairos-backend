@@ -3,11 +3,16 @@ import logging
 
 from fastapi import Depends, FastAPI
 from fastapi import Header
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.dependencies.auth import obtener_usuario_actual
 from app.routes.proxy import router as proxy_router
+from app.services.clerk_google_token_service import (
+    ClerkGoogleTokenService,
+    get_clerk_google_token_service,
+)
 from app.services.notifications_client import crear_notificacion
 from app.services.notifications_client import listar_notificaciones
 from app.services.notifications_client import marcar_notificacion_leida
@@ -69,6 +74,12 @@ async def root() -> dict[str, str]:
         "docs": "/docs",
         "health": "/health",
     }
+
+
+# Note: the gateway obtains Google access tokens server-side when proxying requests
+# (see `app.routes.proxy._try_fetch_google_header`) using the authenticated
+# user's Clerk id. The previously exposed internal token endpoint was removed
+# to avoid exposing token retrieval over HTTP.
 
 
 @app.get("/tasks")

@@ -35,157 +35,132 @@ async def _tokeninfo(access_token: str) -> dict:
     return response.json()
 
 
-async def _token_status(token: str) -> bool:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/token-status"
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.post(url, json={"token": token})
+async def _refresh_access_token(refresh_token: str) -> str:
+    payload = {
+        "refresh_token": refresh_token,
+        "client_id": settings.google_client_id,
+        "client_secret": settings.google_client_secret,
+        "grant_type": "refresh_token",
+    }
+
+    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        response = await client.post(settings.google_token_uri, data=payload)
 
     if response.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No fue posible validar el estado del token.",
-        )
-
-    return bool(response.json().get("blacklisted"))
-
-
-async def _blacklist_token(token: str) -> None:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/token-blacklist"
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.post(url, json={"token": token})
-
-    if response.status_code >= 400:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="No fue posible invalidar el token anterior.",
-        )
-
-
-async def _verify_internal_token(authorization: str) -> dict:
-    url = f"{settings.auth_service_url.rstrip('/')}/auth/verify"
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(url, headers={"Authorization": authorization})
-
-    if response.status_code == 200:
-        return response.json()
-
-    if response.status_code == 401:
+        logger.warning("Google token refresh failed: %s", response.text)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="JWT inválido o expirado.",
+            detail="No fue posible refrescar el access_token de Google.",
         )
 
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="No fue posible validar el JWT interno.",
-    )
-
-
-def _extract_bearer_token(authorization: str | None) -> str:
-    if not authorization:
+    token_response = response.json()
+    access_token = token_response.get("access_token")
+    if not isinstance(access_token, str) or not access_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Falta el header Authorization.",
+            detail="Google no devolvió un access_token válido.",
         )
 
-    parts = authorization.strip().split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
+    return access_token
+
+
+def _verify_gateway_token(internal_token: str | None) -> None:
+    if not settings.internal_service_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Token interno de servicio no configurado.",
+        )
+
+    if not internal_token or internal_token != settings.internal_service_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization debe ser 'Bearer <token>'.",
+            detail="Se requiere X-Internal-Token válido.",
         )
-
-    return parts[1]
 
 
 def _select_google_token(
-    authorization: str | None,
     google_token: str | None,
 ) -> str:
     if google_token and str(google_token).strip():
         return str(google_token).strip()
 
-    if authorization:
-        return _extract_bearer_token(authorization)
-
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Se requiere Authorization o X-Google-Token.",
+        detail="Se requiere X-Google-Access-Token.",
     )
 
 
 async def require_auth(
-    authorization: str | None = Header(None, description="Bearer JWT interno"),
-    google_token: str | None = Header(
-        None, alias="X-Google-Token", description="Google access_token"
+    x_internal_token: str | None = Header(
+        None,
+        alias="X-Internal-Token",
+        description="Token interno enviado por el gateway",
     ),
-    google_refresh: str | None = Header(None, alias="X-Google-Refresh"),
+    google_token: str | None = Header(
+        None,
+        alias="X-Google-Access-Token",
+        description="Google access token interno",
+    ),
+    google_refresh: str | None = Header(
+        None,
+        alias="X-Google-Refresh-Token",
+    ),
 ) -> AuthContext:
-    if not authorization and not google_token:
+    logger.info(
+        "Calendar require_auth headers x-internal-token=%s x-google-access-token=%s x-google-refresh-token=%s",
+        bool(x_internal_token),
+        google_token,
+        google_refresh,
+    )
+
+    _verify_gateway_token(x_internal_token)
+
+    if not google_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Se requiere Authorization o X-Google-Token.",
+            detail="Se requiere X-Google-Access-Token.",
         )
 
-    if google_token and str(google_token).strip():
-        access_token = _select_google_token(authorization, google_token)
+    google_access_token = _select_google_token(google_token)
 
-        if await _token_status(access_token):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token de Google invalidado.",
-            )
+    token_info = None
+    try:
+        token_info = await _tokeninfo(google_access_token)
+    except HTTPException as exc:
+        if google_refresh and exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            google_access_token = await _refresh_access_token(google_refresh)
+            token_info = await _tokeninfo(google_access_token)
+        else:
+            raise
 
-        token_info = await _tokeninfo(access_token)
-        if str(token_info.get("aud") or "").strip() not in (
-            "",
-            settings.google_client_id,
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="El token no pertenece a este cliente OAuth.",
-            )
-
-        google_user_id = str(
-            token_info.get("sub") or token_info.get("user_id") or ""
-        ).strip()
-        if not google_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="No fue posible identificar al usuario de Google.",
-            )
-
-        return AuthContext(
-            user_id=google_user_id,
-            access_token=access_token,
-            refresh_token=google_refresh,
+    if token_info is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de Google inválido o expirado.",
         )
 
-    if authorization:
-        jwt_token = _extract_bearer_token(authorization)
-        if await _token_status(jwt_token):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT invalidado.",
-            )
-
-        payload = await _verify_internal_token(authorization)
-        user_id = (
-            str(payload.get("id_usuario") or payload.get("sub") or "").strip() or None
-        )
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT no contiene el identificador del usuario.",
-            )
-
-        return AuthContext(
-            user_id=user_id, access_token=None, refresh_token=google_refresh
+    if str(token_info.get("aud") or "").strip() not in (
+        "",
+        settings.google_client_id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="El token no pertenece a este cliente OAuth.",
         )
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Se requiere Authorization o X-Google-Token.",
+    google_user_id = str(
+        token_info.get("sub") or token_info.get("user_id") or ""
+    ).strip()
+    if not google_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No fue posible identificar al usuario de Google.",
+        )
+
+    return AuthContext(
+        user_id=google_user_id,
+        access_token=google_access_token,
+        refresh_token=google_refresh,
     )
 
 
@@ -212,7 +187,7 @@ def require_google_login(func):
         if not auth or not auth.access_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Debe iniciar sesion con Google (X-Google-Token).",
+                detail="Debe iniciar sesion con Google (X-Google-Access-Token).",
             )
 
         return await func(*args, **kwargs)

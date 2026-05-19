@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     redis_db: int = 0
     redis_password: str | None = None
     internal_service_token: str | None = None
+    rabbitmq_url: str = "amqp://guest:guest@rabbitmq:5672/"
+    google_sync_queue: str = "auth.google.sync"
 
     @property
     def database_url(self) -> URL:

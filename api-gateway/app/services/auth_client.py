@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Any
 
+import json
 import httpx
 import jwt
 from jwt import PyJWKClient
@@ -10,12 +12,14 @@ from jwt import PyJWKClient
 from app.config import get_settings
 
 
+logger = logging.getLogger("api_gateway.auth_client")
 settings = get_settings()
 
 
 @lru_cache(maxsize=1)
 def _jwks_client() -> PyJWKClient | None:
     if not settings.clerk_jwks_url:
+        logger.debug("CLERK_JWKS_URL is missing, Clerk JWT verification will be disabled.")
         return None
     return PyJWKClient(settings.clerk_jwks_url)
 
@@ -62,10 +66,32 @@ async def _fetch_clerk_user(clerk_user_id: str) -> dict[str, Any] | None:
     return response.json()
 
 
+async def _fetch_jwks() -> dict[str, Any] | None:
+    if not settings.clerk_jwks_url:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+            response = await client.get(settings.clerk_jwks_url)
+    except httpx.RequestError:
+        return None
+
+    if response.status_code >= 400:
+        return None
+
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
 async def _decode_clerk_token(token: str) -> dict[str, Any] | None:
     client = _jwks_client()
     if client is None:
         return None
+
+    signing_key = None
+    payload = None
 
     try:
         signing_key = client.get_signing_key_from_jwt(token)
@@ -75,8 +101,34 @@ async def _decode_clerk_token(token: str) -> dict[str, Any] | None:
             algorithms=["RS256"],
             options={"verify_aud": False},
         )
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, Exception):
-        return None
+    except Exception as exc:
+        # Retry with manual JWKS fetch if PyJWKClient fails.
+        try:
+            jwks = await _fetch_jwks()
+            if jwks and isinstance(jwks, dict):
+                header = jwt.get_unverified_header(token)
+                kid = header.get("kid")
+                if kid and "keys" in jwks:
+                    key_data = next(
+                        (key for key in jwks["keys"] if key.get("kid") == kid),
+                        None,
+                    )
+                    if key_data:
+                        public_key = jwt.algorithms.RSAAlgorithm.from_jwk(
+                            json.dumps(key_data)
+                        )
+                        payload = jwt.decode(
+                            token,
+                            public_key,
+                            algorithms=["RS256"],
+                            options={"verify_aud": False},
+                        )
+        except Exception as retry_exc:
+            logger.debug("Clerk token decode retry failed: %s", retry_exc)
+
+        if payload is None:
+            logger.debug("Clerk token could not be decoded: %s", exc)
+            return None
 
     clerk_user_id = str(payload.get("sub") or "").strip()
     if not clerk_user_id:

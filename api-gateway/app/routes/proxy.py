@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+import logging
 
 from app.config import get_settings
+from app.dependencies.auth import obtener_usuario_actual
+from app.services.clerk_google_token_service import (
+    ClerkGoogleTokenService,
+    get_clerk_google_token_service,
+)
 from app.services.proxy import proxy_request
 
 
@@ -91,13 +97,105 @@ async def proxy_google_auth(path: str, request: Request):
     )
 
 
+_GOOGLE_ACCESS_TOKEN_HEADER = "X-Google-Access-Token"
+_GOOGLE_REFRESH_TOKEN_HEADER = "X-Google-Refresh-Token"
+_INTERNAL_TOKEN_HEADER = "X-Internal-Token"
+_LEGACY_GOOGLE_TOKEN_HEADERS = {"x-google-token", "x-google-access-token"}
+_LEGACY_GOOGLE_REFRESH_HEADERS = {"x-google-refresh", "x-google-refresh-token"}
+
+
+def _extract_google_headers(request: Request) -> dict[str, str] | None:
+    headers: dict[str, str] = {}
+    token = (
+        request.headers.get(_GOOGLE_ACCESS_TOKEN_HEADER)
+        or request.headers.get("X-Google-Token")
+    )
+    refresh = (
+        request.headers.get(_GOOGLE_REFRESH_TOKEN_HEADER)
+        or request.headers.get("X-Google-Refresh")
+    )
+    if token:
+        headers[_GOOGLE_ACCESS_TOKEN_HEADER] = token
+    if refresh:
+        headers[_GOOGLE_REFRESH_TOKEN_HEADER] = refresh
+    return headers or None
+
+
+async def _require_clerk_user(authorization: str | None) -> dict[str, object]:
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization with Clerk JWT is required.",
+        )
+
+    user = await obtener_usuario_actual(authorization)
+    clerk_id = user.get("clerk_id")
+    if not clerk_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Clerk user could not be resolved from the provided token.",
+        )
+    return user
+
+
+async def _fetch_google_headers_for_clerk(
+    authorization: str | None,
+    clerk_service: ClerkGoogleTokenService,
+) -> dict[str, str]:
+    logger = logging.getLogger("api_gateway.proxy")
+    user = await _require_clerk_user(authorization)
+    clerk_id = user["clerk_id"]
+
+    logger.debug("Attempting Clerk auth lookup from Authorization header.")
+    token_data = await clerk_service.get_google_access_token(clerk_id)
+
+    # Log injection event for testing
+    try:
+        logger.debug(
+            "Injecting %s for clerk_id=%s token=%s refresh=%s",
+            _GOOGLE_ACCESS_TOKEN_HEADER,
+            clerk_id,
+            str(token_data.get("access_token")),
+            str(token_data.get("refresh_token")),
+        )
+    except Exception:
+        pass
+
+    headers = {
+        _GOOGLE_ACCESS_TOKEN_HEADER: str(token_data["access_token"]),
+    }
+    refresh_token = token_data.get("refresh_token")
+    if refresh_token:
+        headers[_GOOGLE_REFRESH_TOKEN_HEADER] = str(refresh_token)
+
+    return headers
+
+
 @router.api_route("/google/{path:path}", methods=_ALL_METHODS)
-async def proxy_calendar_google(path: str, request: Request):
+async def proxy_calendar_google(
+    path: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    clerk_service: ClerkGoogleTokenService = Depends(get_clerk_google_token_service),
+):
+    google_headers = _extract_google_headers(request)
+    if google_headers is not None:
+        await _require_clerk_user(authorization)
+        extra_headers = google_headers
+    else:
+        extra_headers = await _fetch_google_headers_for_clerk(
+            authorization, clerk_service
+        )
+
+    if settings.internal_service_token:
+        extra_headers[_INTERNAL_TOKEN_HEADER] = settings.internal_service_token
+
     return await proxy_request(
         request,
         base_url=settings.calendar_service_url,
         path=f"/google/{path}",
         timeout=settings.request_timeout_seconds,
+        extra_headers=extra_headers,
     )
 
 
@@ -112,12 +210,30 @@ async def proxy_calendar_device(path: str, request: Request):
 
 
 @router.api_route("/fit/{path:path}", methods=_ALL_METHODS)
-async def proxy_fit(path: str, request: Request):
+async def proxy_fit(
+    path: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    clerk_service: ClerkGoogleTokenService = Depends(get_clerk_google_token_service),
+):
+    google_headers = _extract_google_headers(request)
+    if google_headers is not None:
+        await _require_clerk_user(authorization)
+        extra_headers = google_headers
+    else:
+        extra_headers = await _fetch_google_headers_for_clerk(
+            authorization, clerk_service
+        )
+
+    if settings.internal_service_token:
+        extra_headers[_INTERNAL_TOKEN_HEADER] = settings.internal_service_token
+
     return await proxy_request(
         request,
         base_url=settings.google_fit_url,
         path=f"/fit/{path}",
         timeout=settings.request_timeout_seconds,
+        extra_headers=extra_headers,
     )
 
 

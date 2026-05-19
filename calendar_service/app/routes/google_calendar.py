@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_settings
 from app.schemas import (
@@ -17,6 +18,13 @@ from app.schemas import (
 )
 from app.security import AuthContext, require_auth, require_google_login
 from app.services.google_calendar import GoogleCalendarService
+
+
+class GoogleTokenSaveRequest(BaseModel):
+    access_token: str = Field(..., alias="google_access_token")
+    refresh_token: str | None = Field(default=None, alias="google_refresh_token")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 router = APIRouter(prefix="/google", tags=["Google Calendar"])
@@ -37,6 +45,18 @@ async def list_calendars(
 ) -> CalendarListResponse:
     data = await service.list_calendars(auth.access_token)
     return CalendarListResponse.model_validate(data)
+
+
+@router.post("/save-token", summary="Validate and save Google Calendar token")
+async def save_google_calendar_token(
+    payload: GoogleTokenSaveRequest,
+    service: GoogleCalendarService = Depends(get_calendar_service),
+) -> dict[str, str]:
+    await service.list_calendars(payload.access_token)
+    return {
+        "success": True,
+        "message": "Token de Google Calendar válido y registrado.",
+    }
 
 
 @router.get("/events", response_model=EventsListResponse, summary="List events")
