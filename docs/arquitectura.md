@@ -42,3 +42,12 @@ Patrones aplicados:
 - Event-driven architecture para desacoplar responsabilidades.
 - API Gateway para centralizar seguridad, CORS y ruteo.
 - Side-effect-safe design: los servicios publican eventos y los consumidores deciden la acción eventual.
+
+## Flujo Clerk + Google + Kairos
+
+1. El frontend inicia sesión con Clerk.
+2. Clerk únicamente maneja la autenticación y la sesión del usuario.
+3. El backend obtiene el `clerk_user_id` autenticado y llama a Clerk Backend API:
+   `GET https://api.clerk.com/v1/users/{user_id}/oauth_access_tokens/google`
+4. El backend recibe el `access_token` real de Google y lo usa internamente para Calendar y Fit.
+5. El frontend no maneja ni almacena tokens de Google; todas las integraciones Google ocurren server-side.

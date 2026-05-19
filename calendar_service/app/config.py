@@ -61,6 +61,10 @@ class Settings(BaseSettings):
         default="http://auth_service:8000",
         validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
     )
+    internal_service_token: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("INTERNAL_SERVICE_TOKEN", "internal_service_token"),
+    )
     google_tokeninfo_uri: str = Field(
         default="https://oauth2.googleapis.com/tokeninfo",
         validation_alias=AliasChoices("GOOGLE_TOKENINFO_URI", "google_tokeninfo_uri"),

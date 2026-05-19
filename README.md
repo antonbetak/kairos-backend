@@ -9,6 +9,7 @@ El **API Gateway** es el unico punto de entrada expuesto. Todos los microservici
 # Endpoints por microservicio (via gateway)
 
 - `google_auth`: `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`.
+- `google_auth` (Clerk sync): `/auth/google/clerk/session`.
 - `auth_service`: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`, `/auth/verify`.
 - `calendar_service`: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST).
 - `googlefit_service`: `/fit/me`.
@@ -143,6 +144,13 @@ docker compose up --build
   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — credenciales Google
   - `RABBITMQ_URL` — URL de RabbitMQ
 
+  ### Clerk + Google Auth (actualizado)
+
+  - El login principal del cliente se realiza con Clerk.
+  - Clerk solo maneja autenticación y sesión; el frontend no debe obtener ni decodificar tokens de Google.
+  - El backend obtiene el Google OAuth access token directamente desde Clerk Backend API usando `CLERK_SECRET_KEY` cuando necesita llamar a Google APIs.
+  - El frontend no debe enviar ni almacenar `X-Google-Token`/`google_access_token`.
+
 ## 11. Endpoints principales
 
 Resumen de endpoints por servicio (a través del gateway):
@@ -228,7 +236,7 @@ GET `http://localhost:8000/google/calendars`
 Headers:
 
 - `Authorization: Bearer <JWT>` (opcional)
-- `X-Google-Token: <access_token>` (obligatorio)
+- `X-Google-Token: <access_token>` o `Authorization: Bearer <access_token>` (obligatorio cuando accedes Google Calendar)
 
 ### Listar eventos
 
