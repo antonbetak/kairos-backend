@@ -55,7 +55,7 @@ class UserProfileUpdate(BaseModel):
         default=None,
         min_length=3,
         max_length=60,
-        pattern="^[a-z0-9_\\.]+$",
+        pattern="^@?[a-z0-9_\\.]+$",
     )
     avatar_url: str | None = Field(default=None, max_length=500)
 
