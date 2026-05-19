@@ -391,6 +391,7 @@ services:
       NOTIFICATIONS_DB_HOST: notifications_postgres
       NOTIFICATIONS_DB_PORT: ${NOTIFICATIONS_DB_PORT:-5432}
       NOTIFICATIONS_DB_NAME: ${NOTIFICATIONS_DB_NAME:-kairos_notifications_db}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth_service:8000}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
