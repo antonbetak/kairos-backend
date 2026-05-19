@@ -9,6 +9,7 @@ Componentes principales:
 - google_auth: flujo OAuth2 / OpenID Connect con Google.
 - calendar_service: integración con Google Calendar y sincronización al consumir eventos.
 - googlefit_service: acceso a Google Fit (lecturas/metrics).
+- activity_service: feed de actividad, amistades, invitaciones, reacciones y comentarios; consume eventos para compartir progreso.
 - task_service: CRUD de tareas y publicación de eventos de dominio.
 - schedule_service: CRUD de bloques/horarios; publicación de eventos.
 - notifications_service: consumidor de eventos y generación de notificaciones.
@@ -24,6 +25,7 @@ flowchart LR
   Gateway --> AuthService[auth_service]
   Gateway --> GoogleAuth[google_auth]
   Gateway --> Calendar[calendar_service]
+  Gateway --> Activity[activity_service]
   Gateway --> Task[task_service]
   Gateway --> Schedule[schedule_service]
   Task -->|publish Task.Created| Rabbit(RabbitMQ)
@@ -31,6 +33,7 @@ flowchart LR
   Rabbit --> Notifications[notifications_service]
   Rabbit --> Stats[stats_service]
   Rabbit --> Calendar
+  Rabbit --> Activity
   Calendar -->|calls Google APIs| Google[Google Calendar API]
   GoogleAuth -->|token exchange| Google
 ```

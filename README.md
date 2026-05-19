@@ -13,15 +13,16 @@ El **API Gateway** es el unico punto de entrada expuesto. Todos los microservici
 - `auth_service`: `/auth/register`, `/auth/login`, `/auth/refresh`, `/auth/me`, `/auth/verify`.
 - `calendar_service`: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE), `/google/refresh`, `/device/calendars` (GET/POST), `/device/events` (GET/POST).
 - `googlefit_service`: `/fit/me`.
+- `activity_service`: `/activity/me`, `/activity/feed`, `/activity/events`, `/activity/friends`, `/activity/friends/request`, `/activity/friends/{id}/accept`, `/activity/invites`, `/activity/events/{id}/react`, `/activity/events/{id}/comments`.
 - `task_service`: `/tasks` (GET/POST), `/tasks/{id}` (PATCH/DELETE).
 - `schedule_service`: `/schedule` (GET/POST), `/schedule/{id}` (GET/PATCH/DELETE).
 - `stt_service`: `/stt/*` (ej. `/stt/health`).
 - `notifications_service`: `/notificaciones` (GET/POST), `/notificaciones/{id}/leer` (PATCH), `/notificaciones/leer-todas` (PATCH). Alias en gateway: `/notifications`, `/notifications/{id}/read`, `/notifications/read-all`.
 - `stats_service`: `/stats/*` (ej. `/stats/health`).
 - `agent_service`: `/agent/*` (ej. `/agent/health`).
-- Healths via gateway: `/health/google_auth`, `/health/calendar`, `/health/fit`, `/health/auth_service`, `/health/schedule_service`, `/health/task_service`, `/health/stt_service`, `/health/notifications_service`, `/health/stats_service`, `/health/agent_service`.
+- Healths via gateway: `/health/google_auth`, `/health/calendar`, `/health/fit`, `/health/auth_service`, `/health/activity_service`, `/health/schedule_service`, `/health/task_service`, `/health/stt_service`, `/health/notifications_service`, `/health/stats_service`, `/health/agent_service`.
 
-Nota: `/tasks`, `/schedule/*`, `/notificaciones*` y `/notifications*` requieren `Authorization: Bearer <token>` emitido por `auth_service`.
+Nota: `/tasks`, `/schedule/*`, `/activity/*`, `/notificaciones*` y `/notifications*` requieren `Authorization: Bearer <token>` emitido por `auth_service`.
 Nota: `auth_service` y `google_auth` son servicios distintos; sus rutas no colisionan.
 
 # Auditoria de ramas del API Gateway
@@ -44,6 +45,7 @@ Nota: `auth_service` y `google_auth` son servicios distintos; sus rutas no colis
 - `calendar_service` -> `/google/*`, `/device/*` -> `http://calendar-service:8000`
 - `googlefit_service` -> `/fit/*` -> `http://googlefit_service:8000`
 - `auth_service` -> `/auth/*` -> `http://auth_service:8000`
+- `activity_service` -> `/activity/*` -> `http://activity_service:8000`
 - `task_service` -> `/tasks` -> `http://task_service:8000`
 - `schedule_service` -> `/schedule`, `/schedule/{id}` -> `http://schedule_service:8000`
 - `stt_service` -> `/stt/*` -> `http://stt_service:8000`
@@ -67,7 +69,7 @@ Resumen breve del repositorio y guía principal. Este README contiene la informa
 
 **Base URL (gateway):** `http://localhost:8000`
 
-**Estructura de alto nivel:** cada microservicio vive en una carpeta raíz (`auth_service`, `google_auth`, `calendar_service`, `task_service`, `schedule_service`, `notifications_service`, `googlefit_service`, `stats_service`, `agent_service`, `stt_service`) y el único punto de entrada expuesto al host es el API Gateway.
+**Estructura de alto nivel:** cada microservicio vive en una carpeta raíz (`auth_service`, `google_auth`, `calendar_service`, `activity_service`, `task_service`, `schedule_service`, `notifications_service`, `googlefit_service`, `stats_service`, `agent_service`, `stt_service`) y el único punto de entrada expuesto al host es el API Gateway.
 
 **Nota importante:** muchas rutas expuestas por el gateway requieren autenticación con un `JWT` emitido por `auth_service`. Para integraciones con Google Calendar/Fit se usan tokens de Google (`X-Google-Token`).
 
@@ -88,15 +90,17 @@ Resumen breve del repositorio y guía principal. Este README contiene la informa
 
 ## 4. Problema que resolvemos
 
-Las personas necesitan una plataforma ligera que centralice tareas, horarios y notificaciones, sincronizando opcionalmente con servicios de Google (Calendar, Fit) y enviando notificaciones y métricas de forma asíncrona entre microservicios.
+Las personas necesitan una plataforma ligera que centralice tareas, horarios, actividad social y notificaciones, sincronizando opcionalmente con servicios de Google (Calendar, Fit) y enviando notificaciones, métricas y progreso compartido de forma asíncrona entre microservicios.
 
 ## 5. Solución
 
-Conjunto de microservicios desacoplados que se comunican mediante RabbitMQ para eventos de dominio (p. ej. tareas creadas, tareas vencidas, horarios creados). Un API Gateway expone los endpoints al cliente y actúa como proxy hacia los servicios internos.
+Conjunto de microservicios desacoplados que se comunican mediante RabbitMQ para eventos de dominio (p. ej. tareas creadas, tareas completadas, tareas vencidas, horarios creados). Un API Gateway expone los endpoints al cliente y actúa como proxy hacia los servicios internos.
 
 ## 6. Arquitectura general
 
 Arquitectura basada en microservicios + bus de eventos (RabbitMQ). El gateway es el único servicio con puertos publicados, el resto queda en la red interna de Docker Compose.
+
+El `activity_service` concentra la parte social de Kairos: registra actividad del usuario, arma el feed de progreso, gestiona amistades e invitaciones, y permite reacciones/comentarios sobre eventos. Además consume eventos de dominio desde RabbitMQ para convertir acciones relevantes, como tareas completadas o bloques terminados, en actividad visible según la privacidad configurada.
 
 Diagrama y más detalles en: [docs/arquitectura.md](docs/arquitectura.md)
 
@@ -159,6 +163,7 @@ Resumen de endpoints por servicio (a través del gateway):
 - Google OAuth: `/auth/google/login`, `/auth/google/callback`, `/auth/google/refresh`, `/auth/google/me`  
 - Calendar: `/google/calendars`, `/google/events` (GET/POST), `/google/events/{id}` (PUT/DELETE)  
 - Google Fit: `/fit/me`  
+- Activity: `/activity/me`, `/activity/feed`, `/activity/events`, `/activity/friends`, `/activity/friends/request`, `/activity/friends/{id}/accept`, `/activity/invites`, `/activity/events/{id}/react`, `/activity/events/{id}/comments`  
 - Tasks: `/tasks` (GET/POST), `/tasks/{id}` (PATCH/DELETE)  
 - Schedule: `/schedule` (GET/POST), `/schedule/{id}` (GET/PATCH/DELETE)  
 - Notifications: `/notificaciones` (GET/POST), `/notificaciones/{id}/leer` (PATCH) — alias `/notifications` en gateway  
@@ -170,11 +175,12 @@ Detalles y ejemplos en: [docs/api.md](docs/api.md)
 Los eventos de dominio que circulan por RabbitMQ:
 
 - `Task.Created` — publicado por `task_service`. Consumidores: `notifications_service`, `schedule_service`, `stats_service`, `calendar_service` (si llega `X-Google-Token`).
-- `Task.Completed` — publicado por `task_service`. Consumidores: `notifications_service`, `stats_service`.
+- `Task.Completed` — publicado por `task_service`. Consumidores: `notifications_service`, `stats_service`, `activity_service`.
 - `Task.DueWarning` — publicado por `task_service`. Consumidor: `notifications_service`.
 - `Task.Due` — publicado por `task_service`. Consumidor: `notifications_service`.
 - `Schedule.Created`, `Schedule.Updated`, `Schedule.Error` — publicados por `schedule_service`. Consumidores: `notifications_service`, `stats_service`, `calendar_service`.
-- `bloque.completado` — evento de negocio adicional.
+- `bloque.completado` — evento de negocio adicional. Consumidor: `activity_service`.
+- `logro.desbloqueado`, `racha.actualizada` — eventos de progreso social. Consumidor: `activity_service`.
 
 Descripción detallada de contratos y payloads en: [docs/eventos.md](docs/eventos.md)
 
