@@ -74,6 +74,10 @@ class Settings(BaseSettings):
         default="http://auth_service:8000",
         validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
     )
+    activity_service_url: str = Field(
+        default="http://activity_service:8000",
+        validation_alias=AliasChoices("ACTIVITY_SERVICE_URL", "activity_service_url"),
+    )
     schedule_service_url: str = Field(
         default="http://schedule_service:8000",
         validation_alias=AliasChoices("SCHEDULE_SERVICE_URL", "schedule_service_url"),
