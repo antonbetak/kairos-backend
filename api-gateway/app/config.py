@@ -78,6 +78,18 @@ class Settings(BaseSettings):
         default="http://activity_service:8000",
         validation_alias=AliasChoices("ACTIVITY_SERVICE_URL", "activity_service_url"),
     )
+    clerk_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CLERK_SECRET_KEY", "clerk_secret_key"),
+    )
+    clerk_jwks_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("CLERK_JWKS_URL", "clerk_jwks_url"),
+    )
+    internal_service_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("INTERNAL_SERVICE_TOKEN", "internal_service_token"),
+    )
     schedule_service_url: str = Field(
         default="http://schedule_service:8000",
         validation_alias=AliasChoices("SCHEDULE_SERVICE_URL", "schedule_service_url"),

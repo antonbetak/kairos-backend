@@ -1,4 +1,5 @@
 import re
+import secrets
 import unicodedata
 from fastapi import FastAPI
 from fastapi import Depends
@@ -15,10 +16,12 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app import models
+from app.config import settings
 from app.database import Base
 from app.database import SessionLocal
 from app.database import engine
 from app.schemas import TokenResponse
+from app.schemas import ClerkUserSync
 from app.schemas import UserCreate
 from app.schemas import UserLogin
 from app.schemas import PublicUserResponse
@@ -147,10 +150,16 @@ def create_tables():
     Base.metadata.create_all(bind=engine)
     with engine.begin() as connection:
         connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS clerk_id VARCHAR(120)"
+        )
+        connection.exec_driver_sql(
             "ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS handle VARCHAR(60)"
         )
         connection.exec_driver_sql(
             "ALTER TABLE IF EXISTS usuarios ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)"
+        )
+        connection.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_usuarios_clerk_id ON usuarios (clerk_id)"
         )
         connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_usuarios_handle ON usuarios (handle)"
@@ -192,6 +201,63 @@ def register_user(
 
     db.refresh(user)
     response.status_code = status.HTTP_201_CREATED
+    return user
+
+
+def _verify_internal_token(x_internal_token: str | None) -> None:
+    if settings.internal_service_token and x_internal_token != settings.internal_service_token:
+        raise HTTPException(status_code=403, detail="Token interno invalido")
+
+
+@app.post("/auth/clerk/sync", response_model=UserResponse)
+def sync_clerk_user(
+    payload: ClerkUserSync,
+    x_internal_token: str | None = Header(default=None, alias="X-Internal-Token"),
+    db: Session = Depends(get_db),
+):
+    _verify_internal_token(x_internal_token)
+
+    user = db.execute(
+        select(models.User).where(models.User.clerk_id == payload.clerk_id)
+    ).scalar_one_or_none()
+    if user:
+        if payload.avatar_url and user.avatar_url != payload.avatar_url:
+            user.avatar_url = payload.avatar_url
+            db.commit()
+            db.refresh(user)
+        return user
+
+    user = db.execute(
+        select(models.User).where(models.User.email == payload.email)
+    ).scalar_one_or_none()
+    if user:
+        user.clerk_id = payload.clerk_id
+        if payload.avatar_url and not user.avatar_url:
+            user.avatar_url = payload.avatar_url
+        if not user.handle:
+            user.handle = _generate_unique_handle(db, user.nombre, user.email)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    nombre = (payload.nombre or payload.email.split("@", 1)[0]).strip()
+    user = models.User(
+        nombre=nombre or "Usuario Kairos",
+        email=payload.email,
+        clerk_id=payload.clerk_id,
+        handle=_generate_unique_handle(db, nombre, payload.email),
+        avatar_url=payload.avatar_url,
+        password_hash=pwd_context.hash(secrets.token_urlsafe(32)),
+    )
+
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Usuario Clerk ya registrado")
+
+    db.refresh(user)
     return user
 
 

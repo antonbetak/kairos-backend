@@ -18,6 +18,18 @@ class UserCreate(BaseModel):
         return value.strip().lower()
 
 
+class ClerkUserSync(BaseModel):
+    clerk_id: str
+    email: str
+    nombre: str | None = None
+    avatar_url: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+
 class UserLogin(BaseModel):
     email: str
     password: str
@@ -34,6 +46,7 @@ class UserResponse(BaseModel):
     id_usuario: UUID
     nombre: str
     email: str
+    clerk_id: str | None = None
     handle: str | None = None
     avatar_url: str | None = None
     created_at: datetime
