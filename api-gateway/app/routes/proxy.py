@@ -1,8 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+import logging
 
 from app.config import get_settings
+from app.dependencies.auth import obtener_usuario_actual
+from app.services.clerk_google_token_service import (
+    ClerkGoogleTokenService,
+    get_clerk_google_token_service,
+)
 from app.services.proxy import proxy_request
 
 
@@ -91,13 +97,71 @@ async def proxy_google_auth(path: str, request: Request):
     )
 
 
+async def _build_proxy_headers(
+    request: Request, extra_headers: dict[str, str] | None = None
+) -> dict[str, str]:
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    if extra_headers:
+        headers.update(extra_headers)
+        if any(k.lower() == "x-google-token" for k in extra_headers):
+            headers.pop("authorization", None)
+            headers.pop("Authorization", None)
+    return headers
+
+
+async def _try_fetch_google_header(
+    authorization: str | None,
+    clerk_service: ClerkGoogleTokenService,
+) -> dict[str, str] | None:
+    logger = logging.getLogger("api_gateway.proxy")
+    if not authorization:
+        logger.debug("No Authorization header present, skipping Clerk Google token lookup.")
+        return None
+
+    logger.debug("Attempting Clerk auth lookup from Authorization header.")
+    try:
+        usuario = await obtener_usuario_actual(authorization)
+    except HTTPException as exc:
+        logger.debug("Clerk auth lookup failed: %s", exc.detail if hasattr(exc, 'detail') else exc)
+        return None
+
+    clerk_id = usuario.get("clerk_id")
+    if not clerk_id:
+        logger.debug("Clerk auth lookup returned no clerk_id: %s", usuario)
+        return None
+
+    token_data = await clerk_service.get_google_access_token(clerk_id)
+
+    # Log injection event for testing
+    try:
+        logger.debug(
+            "Injecting X-Google-Token for clerk_id=%s token=%s",
+            clerk_id,
+            str(token_data.get("access_token")),
+        )
+    except Exception:
+        pass
+
+    return {"X-Google-Token": str(token_data["access_token"])}
+
+
 @router.api_route("/google/{path:path}", methods=_ALL_METHODS)
-async def proxy_calendar_google(path: str, request: Request):
+async def proxy_calendar_google(
+    path: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    clerk_service: ClerkGoogleTokenService = Depends(get_clerk_google_token_service),
+):
+    extra_headers = None
+    if "x-google-token" not in {k.lower() for k in request.headers.keys()}:
+        extra_headers = await _try_fetch_google_header(authorization, clerk_service)
+
     return await proxy_request(
         request,
         base_url=settings.calendar_service_url,
         path=f"/google/{path}",
         timeout=settings.request_timeout_seconds,
+        extra_headers=extra_headers,
     )
 
 
@@ -112,12 +176,22 @@ async def proxy_calendar_device(path: str, request: Request):
 
 
 @router.api_route("/fit/{path:path}", methods=_ALL_METHODS)
-async def proxy_fit(path: str, request: Request):
+async def proxy_fit(
+    path: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    clerk_service: ClerkGoogleTokenService = Depends(get_clerk_google_token_service),
+):
+    extra_headers = None
+    if "x-google-token" not in {k.lower() for k in request.headers.keys()}:
+        extra_headers = await _try_fetch_google_header(authorization, clerk_service)
+
     return await proxy_request(
         request,
         base_url=settings.google_fit_url,
         path=f"/fit/{path}",
         timeout=settings.request_timeout_seconds,
+        extra_headers=extra_headers,
     )
 
 

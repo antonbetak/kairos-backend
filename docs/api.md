@@ -17,6 +17,40 @@ Todos los endpoints del gateway se acceden contra `http://localhost:8000`.
 - `GET /auth/google/callback` — callback de Google.
 - `POST /auth/google/refresh` — renueva tokens Google.
 
+### Respuesta unificada de Google Auth
+
+Los endpoints `GET /auth/google/callback` y `POST /auth/google/clerk/session` devuelven:
+
+```json
+{
+  "provider": "google",
+  "user": {
+    "email": "user@example.com",
+    "name": "User Example",
+    "picture": "https://...",
+    "google_id": "google-sub",
+    "email_verified": true
+  },
+  "kairos_user": {
+    "id_usuario": "uuid",
+    "nombre": "User Example",
+    "email": "user@example.com",
+    "handle": "userexample",
+    "avatar_url": "https://..."
+  },
+  "tokens": {
+    "access_token": "google-access-token",
+    "refresh_token": "google-refresh-token"
+  },
+  "kairos_tokens": {
+    "access_token": "kairos-jwt",
+    "refresh_token": "kairos-refresh-jwt"
+  }
+}
+```
+
+Internamente `google_auth` solicita la sincronizacion/creacion de usuario a `auth_service` por RabbitMQ (`auth.google.sync`).
+
 ## Tasks
 
 - `GET /tasks` — lista tareas del usuario (JWT requerido).
@@ -43,9 +77,9 @@ Todos los endpoints del gateway se acceden contra `http://localhost:8000`.
 
 ## Google Calendar proxy
 
-- `GET /google/calendars` — lista calendars (requiere header `X-Google-Token: <access_token>`).
-- `GET /google/events` — lista eventos del calendario del token.
-- `POST /google/events` — crea evento en Google Calendar. Requiere `X-Google-Token`.
+- `GET /google/calendars` — lista calendars. El gateway puede inyectar el token de Google desde Clerk si la sesión del usuario es válida.
+- `GET /google/events` — lista eventos del calendario.
+- `POST /google/events` — crea evento en Google Calendar.
 - `PUT /google/events/{id}`, `DELETE /google/events/{id}` — actualizar / borrar evento.
 
 ## Notifications
@@ -56,7 +90,7 @@ Todos los endpoints del gateway se acceden contra `http://localhost:8000`.
 
 ## Headers relevantes
 
-- `Authorization: Bearer <jwt>` — para rutas protegidas por `auth_service`.
-- `X-Google-Token: <access_token>` — para rutas que actúan sobre Google APIs (Calendar/Fit).
+- `Authorization: Bearer <jwt>` — para rutas protegidas por `auth_service` o Clerk session según el endpoint.
+- `X-Google-Token: <access_token>` — opcional; el gateway puede inyectar el token de Google internamente si el usuario está autenticado.
 
 Para ejemplos de `curl` y secuencias completas ver: [docs/pruebas.md](docs/pruebas.md)

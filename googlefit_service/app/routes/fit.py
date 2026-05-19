@@ -3,11 +3,19 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import get_settings
 from app.schemas import FitMeResponse, FitTimeRange
 from app.security import FitAuthContext, require_google_login, require_google_token
 from app.services.google_fit import GoogleFitService
+
+
+class GoogleFitTokenSaveRequest(BaseModel):
+    access_token: str = Field(..., alias="google_access_token")
+    refresh_token: str | None = Field(default=None, alias="google_refresh_token")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 router = APIRouter(prefix="/fit", tags=["Google Fit"])
@@ -16,6 +24,18 @@ settings = get_settings()
 
 def get_fit_service() -> GoogleFitService:
     return GoogleFitService(settings)
+
+
+@router.post("/save-token", summary="Validate and save Google Fit token")
+async def save_google_fit_token(
+    payload: GoogleFitTokenSaveRequest,
+    service: GoogleFitService = Depends(get_fit_service),
+) -> dict[str, str]:
+    await service.list_data_sources(payload.access_token)
+    return {
+        "success": True,
+        "message": "Token de Google Fit válido y registrado.",
+    }
 
 
 def _parse_datetime(value: str) -> datetime:

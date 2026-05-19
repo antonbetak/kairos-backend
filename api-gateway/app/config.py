@@ -82,9 +82,17 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("CLERK_SECRET_KEY", "clerk_secret_key"),
     )
+    clerk_api_base: str = Field(
+        default="https://api.clerk.com/v1",
+        validation_alias=AliasChoices("CLERK_API_BASE", "clerk_api_base"),
+    )
     clerk_jwks_url: str = Field(
         default="",
         validation_alias=AliasChoices("CLERK_JWKS_URL", "clerk_jwks_url"),
+    )
+    google_scope: str = Field(
+        default="openid email profile",
+        validation_alias=AliasChoices("GOOGLE_SCOPE", "google_scope"),
     )
     internal_service_token: str = Field(
         default="",
@@ -135,6 +143,13 @@ class Settings(BaseSettings):
 
         parsed = [origin.strip() for origin in value.split(",") if origin.strip()]
         return parsed or default_origins
+
+    def google_required_scopes_list(self) -> list[str]:
+        value = self.google_scope
+        if value is None:
+            return []
+
+        return [scope.strip() for scope in str(value).split() if scope.strip()]
 
 
 @lru_cache(maxsize=1)

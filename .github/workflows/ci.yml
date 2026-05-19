@@ -39,6 +39,8 @@ jobs:
           REDIS_HOST=redis
           REDIS_PORT=6379
           REDIS_DB=0
+          RABBITMQ_PORT=5672
+          RABBITMQ_MANAGEMENT_PORT=15672
           EOF
 
       - name: Start auth stack
@@ -95,6 +97,8 @@ jobs:
           GOOGLE_CLIENT_SECRET=ci-google-client-secret
           GOOGLE_REDIRECT_URI=http://localhost:8007/auth/google/callback
           AUTH_SERVICE_URL=http://auth_service:8000
+          RABBITMQ_PORT=5672
+          RABBITMQ_MANAGEMENT_PORT=15672
           EOF
 
       - name: Start google-auth

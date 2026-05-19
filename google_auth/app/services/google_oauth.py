@@ -18,6 +18,7 @@ from google.oauth2 import id_token as google_id_token
 
 from app.config import Settings
 from app.schemas import GoogleAuthResponse, GoogleTokenSet, GoogleUserProfile
+from app.services.auth_sync_bus import AuthSyncBusClient
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ class GoogleOAuthService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._state_secret = settings.google_client_secret.encode("utf-8")
+        self._auth_sync_bus = AuthSyncBusClient(settings)
 
     async def _token_status(self, token: str) -> bool:
         url = f"{self.settings.auth_service_url.rstrip('/')}/auth/token-status"
@@ -269,7 +271,71 @@ class GoogleOAuthService:
             id_token=id_token_value,
         )
 
-        return GoogleAuthResponse(user=user, tokens=tokens)
+        logger.info(
+            "Google OAuth authenticate: user=%s google_access_token=%s google_refresh_token=%s",
+            user.email,
+            tokens.access_token,
+            tokens.refresh_token,
+        )
+
+        kairos_user, kairos_tokens = self._auth_sync_bus.sync_google_user(user)
+
+        return GoogleAuthResponse(
+            user=user,
+            tokens=tokens,
+            kairos_user=kairos_user,
+            kairos_tokens=kairos_tokens,
+        )
+
+    async def _verify_clerk_google_token(
+        self,
+        user: GoogleUserProfile,
+        tokens: GoogleTokenSet,
+    ) -> None:
+        if tokens.id_token:
+            claims = self.verify_id_token(tokens.id_token)
+            token_email = str(claims.get("email") or "").strip().lower()
+            token_sub = str(claims.get("sub") or claims.get("user_id") or "").strip()
+            if token_email != user.email.lower() or token_sub != user.google_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="El id_token de Google no coincide con el usuario Clerk proporcionado.",
+                )
+
+        userinfo = await self.fetch_userinfo(tokens.access_token)
+        userinfo_email = str(userinfo.get("email") or "").strip().lower()
+        userinfo_sub = str(userinfo.get("sub") or userinfo.get("user_id") or "").strip()
+        if not userinfo_email or not userinfo_sub:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="El access_token de Google no es válido o no contiene información de usuario.",
+            )
+
+        if userinfo_email != user.email.lower() or userinfo_sub != user.google_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="El access_token de Google no coincide con el usuario Clerk proporcionado.",
+            )
+
+    async def authenticate_clerk_session(
+        self,
+        user: GoogleUserProfile,
+        tokens: GoogleTokenSet,
+    ) -> GoogleAuthResponse:
+        await self._verify_clerk_google_token(user, tokens)
+        logger.info(
+            "Google OAuth authenticate_clerk_session: user=%s google_access_token=%s google_refresh_token=%s",
+            user.email,
+            tokens.access_token,
+            tokens.refresh_token,
+        )
+        kairos_user, kairos_tokens = self._auth_sync_bus.sync_google_user(user)
+        return GoogleAuthResponse(
+            user=user,
+            tokens=tokens,
+            kairos_user=kairos_user,
+            kairos_tokens=kairos_tokens,
+        )
 
     async def blacklist_access_token(self, token: str) -> None:
         await self._blacklist_token(token)

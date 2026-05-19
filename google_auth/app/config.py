@@ -65,6 +65,36 @@ class Settings(BaseSettings):
         default="http://auth_service:8000",
         validation_alias=AliasChoices("AUTH_SERVICE_URL", "auth_service_url"),
     )
+    calendar_service_url: str = Field(
+        default="http://calendar_service:8000",
+        validation_alias=AliasChoices("CALENDAR_SERVICE_URL", "calendar_service_url"),
+    )
+    google_fit_url: str = Field(
+        default="http://googlefit_service:8000",
+        validation_alias=AliasChoices("GOOGLE_FIT_URL", "google_fit_url"),
+    )
+    request_timeout_seconds: float = Field(
+        default=20.0,
+        validation_alias=AliasChoices("REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds"),
+    )
+    rabbitmq_url: str = Field(
+        default="amqp://guest:guest@rabbitmq:5672/",
+        validation_alias=AliasChoices("RABBITMQ_URL", "rabbitmq_url"),
+    )
+    auth_google_sync_queue: str = Field(
+        default="auth.google.sync",
+        validation_alias=AliasChoices(
+            "AUTH_GOOGLE_SYNC_QUEUE",
+            "auth_google_sync_queue",
+        ),
+    )
+    auth_google_sync_timeout_seconds: float = Field(
+        default=12.0,
+        validation_alias=AliasChoices(
+            "AUTH_GOOGLE_SYNC_TIMEOUT_SECONDS",
+            "auth_google_sync_timeout_seconds",
+        ),
+    )
     google_redirect_uri: str = Field(
         ...,
         validation_alias=AliasChoices("GOOGLE_REDIRECT_URI", "google_redirect_uri"),

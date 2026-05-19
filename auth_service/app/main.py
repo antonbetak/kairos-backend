@@ -1,5 +1,6 @@
 import re
 import secrets
+from threading import Thread
 import unicodedata
 from fastapi import FastAPI
 from fastapi import Depends
@@ -32,6 +33,7 @@ from app.schemas import TokenStatusRequest
 from app.schemas import TokenStatusResponse
 from app.schemas import TokenBlacklistRequest
 from app.schemas import VerifyTokenResponse
+from app.schemas import GoogleUserSync
 from app.security import create_access_token
 from app.security import create_token_session_id
 from app.security import create_refresh_token
@@ -41,10 +43,12 @@ from app.security import get_token_expiration
 from app.token_blacklist import blacklist_token
 from app.token_blacklist import blacklist_session
 from app.token_blacklist import is_token_blacklisted
+from app.services.rabbitmq_google_sync import start_google_sync_consumer
 
 app = FastAPI(title="Kairos Auth Service")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 HANDLE_PATTERN = re.compile(r"[^a-z0-9_.]+")
+google_sync_thread: Thread | None = None
 
 
 def get_db():
@@ -165,6 +169,11 @@ def create_tables():
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_usuarios_handle ON usuarios (handle)"
         )
 
+    global google_sync_thread
+    if google_sync_thread is None or not google_sync_thread.is_alive():
+        google_sync_thread = Thread(target=start_google_sync_consumer, daemon=True)
+        google_sync_thread.start()
+
 
 @app.get("/health")
 def health():
@@ -259,6 +268,65 @@ def sync_clerk_user(
 
     db.refresh(user)
     return user
+
+
+@app.post("/auth/internal/google/sync", response_model=TokenResponse)
+def sync_google_user_and_issue_tokens(
+    payload: GoogleUserSync,
+    x_internal_token: str | None = Header(default=None, alias="X-Internal-Token"),
+    db: Session = Depends(get_db),
+):
+    _verify_internal_token(x_internal_token)
+
+    user = db.execute(
+        select(models.User).where(models.User.email == payload.email)
+    ).scalar_one_or_none()
+
+    if user:
+        updates = False
+        if payload.picture and user.avatar_url != payload.picture:
+            user.avatar_url = payload.picture
+            updates = True
+        if not user.handle:
+            user.handle = _generate_unique_handle(db, user.nombre, user.email)
+            updates = True
+        if updates:
+            db.commit()
+            db.refresh(user)
+    else:
+        user = models.User(
+            nombre=payload.nombre.strip() or payload.email.split("@", 1)[0],
+            email=payload.email,
+            handle=_generate_unique_handle(db, payload.nombre, payload.email),
+            avatar_url=payload.picture,
+            password_hash=pwd_context.hash(secrets.token_urlsafe(32)),
+        )
+        db.add(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Email already registered")
+        db.refresh(user)
+
+    session_id = create_token_session_id()
+    access_token, expires_in = create_access_token(
+        user_id=user.id_usuario,
+        email=user.email,
+        session_id=session_id,
+    )
+    refresh_token, refresh_expires_in = create_refresh_token(
+        user_id=user.id_usuario,
+        email=user.email,
+        session_id=session_id,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        expires_in=expires_in,
+        refresh_token=refresh_token,
+        refresh_expires_in=refresh_expires_in,
+    )
 
 
 @app.post("/auth/login", response_model=TokenResponse)

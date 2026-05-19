@@ -39,11 +39,18 @@ async def proxy_request(
     base_url: str,
     path: str,
     timeout: float,
+    extra_headers: dict[str, str] | None = None,
 ) -> Response:
     url = f"{base_url.rstrip('/')}{path}"
     params = list(request.query_params.multi_items())
     body = await request.body()
     headers = _filter_headers(request.headers.items())
+    if extra_headers:
+        if any(k.lower() == "x-google-token" for k in extra_headers):
+            headers.pop("Authorization", None)
+            headers.pop("authorization", None)
+            logger.debug("Proxy removed Authorization header because X-Google-Token was injected.")
+        headers.update(extra_headers)
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:

@@ -99,44 +99,79 @@ def _extract_bearer_token(authorization: str | None) -> str:
 
 
 def _select_google_token(
-    authorization: str | None,
     google_token: str | None,
 ) -> str:
     if google_token and str(google_token).strip():
         return str(google_token).strip()
 
-    if authorization:
-        return _extract_bearer_token(authorization)
-
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Se requiere Authorization o X-Google-Token.",
+        detail="Se requiere X-Google-Token.",
     )
 
 
 async def require_auth(
-    authorization: str | None = Header(None, description="Bearer JWT interno"),
+    authorization: str | None = Header(None, description="Bearer JWT interno o Google access_token"),
     google_token: str | None = Header(
         None, alias="X-Google-Token", description="Google access_token"
     ),
     google_refresh: str | None = Header(None, alias="X-Google-Refresh"),
 ) -> AuthContext:
+    logger.info(
+        "Calendar require_auth headers authorization=%s x-google-token=%s x-google-refresh=%s",
+        authorization,
+        google_token,
+        google_refresh,
+    )
     if not authorization and not google_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Se requiere Authorization o X-Google-Token.",
         )
 
-    if google_token and str(google_token).strip():
-        access_token = _select_google_token(authorization, google_token)
+    kairos_user_id: str | None = None
+    google_access_token: str | None = None
 
-        if await _token_status(access_token):
+    if authorization:
+        auth_token = _extract_bearer_token(authorization)
+        try:
+            if await _token_status(auth_token):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="JWT invalidado.",
+                )
+
+            payload = await _verify_internal_token(f"Bearer {auth_token}")
+            kairos_user_id = (
+                str(payload.get("id_usuario") or payload.get("sub") or "").strip() or None
+            )
+            if not kairos_user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="JWT no contiene el identificador del usuario.",
+                )
+        except HTTPException as exc:
+            if google_token:
+                # Si ya contamos con un token de Google, ignoramos el intento de JWT.
+                pass
+            elif exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                google_access_token = auth_token
+            else:
+                raise
+
+    if google_token and str(google_token).strip():
+        logger.info("Calendar require_auth using X-Google-Token: %s", google_token)
+        google_access_token = _select_google_token(google_token)
+
+    if google_access_token:
+        logger.info("Calendar require_auth selected google_access_token=%s", google_access_token)
+        if await _token_status(google_access_token):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token de Google invalidado.",
             )
 
-        token_info = await _tokeninfo(access_token)
+        token_info = await _tokeninfo(google_access_token)
         if str(token_info.get("aud") or "").strip() not in (
             "",
             settings.google_client_id,
@@ -156,31 +191,16 @@ async def require_auth(
             )
 
         return AuthContext(
-            user_id=google_user_id,
-            access_token=access_token,
+            user_id=kairos_user_id or google_user_id,
+            access_token=google_access_token,
             refresh_token=google_refresh,
         )
 
-    if authorization:
-        jwt_token = _extract_bearer_token(authorization)
-        if await _token_status(jwt_token):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT invalidado.",
-            )
-
-        payload = await _verify_internal_token(authorization)
-        user_id = (
-            str(payload.get("id_usuario") or payload.get("sub") or "").strip() or None
-        )
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="JWT no contiene el identificador del usuario.",
-            )
-
+    if kairos_user_id:
         return AuthContext(
-            user_id=user_id, access_token=None, refresh_token=google_refresh
+            user_id=kairos_user_id,
+            access_token=None,
+            refresh_token=google_refresh,
         )
 
     raise HTTPException(

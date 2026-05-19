@@ -49,6 +49,26 @@ async def _blacklist_token(token: str) -> None:
         )
 
 
+async def _verify_internal_token(authorization: str) -> dict[str, Any]:
+    url = f"{settings.auth_service_url.rstrip('/')}/auth/verify"
+    async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        response = await client.get(url, headers={"Authorization": authorization})
+
+    if response.status_code == 200:
+        return response.json()
+
+    if response.status_code == 401:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="JWT invalido o expirado.",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="No fue posible validar el JWT interno.",
+    )
+
+
 def _select_google_token(authorization: str | None, google_token: str | None) -> str:
     if google_token and str(google_token).strip():
         return str(google_token).strip()
@@ -128,10 +148,30 @@ async def require_google_token(
     ),
     google_refresh: str | None = Header(None, alias="X-Google-Refresh"),
 ) -> FitAuthContext:
+    logger.info(
+        "Fit require_google_token headers authorization=%s x-google-token=%s x-google-refresh=%s",
+        authorization,
+        google_token,
+        google_refresh,
+    )
     access_token = _select_google_token(authorization, google_token)
     refreshed = False
+    kairos_user_id: str | None = None
+
+    if authorization and google_token and str(google_token).strip():
+        jwt_token = authorization
+        if await _token_status(_select_google_token(jwt_token, None)):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="JWT invalidado.",
+            )
+        payload = await _verify_internal_token(authorization)
+        kairos_user_id = (
+            str(payload.get("id_usuario") or payload.get("sub") or "").strip() or None
+        )
 
     if await _token_status(access_token):
+        logger.info("Fit require_google_token token invalidated: %s", access_token)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de Google invalidado.",
@@ -170,7 +210,7 @@ async def require_google_token(
     scopes = _validate_scopes(str(token_info.get("scope") or ""))
 
     return FitAuthContext(
-        user_id=user_id,
+        user_id=kairos_user_id or user_id,
         access_token=access_token,
         scopes=scopes,
         expires_in=expires_in_value,
