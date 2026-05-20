@@ -36,6 +36,20 @@ Fecha: {fecha}
 8. Cada bloque debe durar al menos 15 minutos.
 9. Genera entre 3 y 7 bloques.
 10. Usa ActualizarMemoria si detectas algo relevante sobre el usuario que deba recordarse.
+11. IMPORTANTE: En cada bloque, el campo tipo SOLO puede ser uno de estos valores exactos:
+- "tarea"
+- "habito"
+- "evento"
+- "libre"
+12. Si hay tareas pendientes, DEBES crear al menos un bloque tipo "tarea" por cada tarea importante.
+13. Nunca generes solo bloques tipo "libre" si existen tareas, metas o streaks.
+14. Usa "libre" únicamente para descanso, comida o espacios vacíos.
+15. Para estudio, trabajo, proyectos, tareas académicas o productividad usa SIEMPRE tipo "tarea".
+16. Si una tarea tiene duracion_estimada_min, intenta respetar esa duración.
+
+Nunca uses otros valores como "productividad", "descanso", "personal", "estudio" o similares.
+Si el bloque es de trabajo, estudio o concentración, usa "tarea".
+Si es descanso, comida o tiempo personal, usa "libre".
 
 Genera el horario usando la tool generar_horario_dia.
 """

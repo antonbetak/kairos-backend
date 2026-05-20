@@ -16,7 +16,12 @@ class BloqueHorario(BaseModel):
     fecha_inicio: str = Field(description="Inicio en formato YYYY-MM-DDTHH:MM:00")
     fecha_fin: str = Field(description="Fin en formato YYYY-MM-DDTHH:MM:00")
     tipo: Literal["tarea", "habito", "evento", "libre"] = Field(
-        description="Tipo de bloque"
+        description=(
+            "Tipo exacto del bloque. Usa 'tarea' para estudio, trabajo, proyectos "
+            "o actividades productivas. Usa 'habito' para hábitos/streaks. "
+            "Usa 'evento' solo para eventos existentes del calendario. "
+            "Usa 'libre' solo para descanso, comida o tiempo sin actividad asignada."
+        )
     )
     razon: str | None = Field(
         default=None, description="Por qué se propone este bloque en este horario"
