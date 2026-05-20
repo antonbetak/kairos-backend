@@ -60,10 +60,6 @@ curl -H "Authorization: Bearer <token_de_sesion>" http://localhost:8000/google/c
 - Logs de cada servicio: `docker compose logs <service_name>`.
 - Consultas a Postgres: utilizar `psql` dentro del contenedor correspondiente o exponer puerto en `docker-compose` en desarrollo.
 
-## Registro de evidencias
-
-- Guarda respuestas HTTP (JSON) y capturas de pantalla o exporta logs a ficheros para auditoría.
-
 ## Prueba: login con Clerk + sync en Google Auth
 
 1. Iniciar sesion en app con Clerk (Google).
@@ -81,13 +77,8 @@ curl -H "Authorization: Bearer <token_de_sesion>" http://localhost:8000/google/c
   - Calendar devuelve calendarios/eventos del usuario Google autenticado.
   - Fit devuelve métricas/sesiones sin error de permisos.
 3. Verificar en logs de servicios que el gateway obtuvo el token de Google desde Clerk y lo inyectó internamente.
-**Pruebas — Auth y Google Auth**
 
-Este documento recoge los ejemplos de petición (JSON) y descripción para los endpoints de `auth` y `google_auth`/`calendar_service` utilizados en el proyecto.
-
-**Nota sobre las capturas:** Las capturas originales fueron provistas por el autor. Por seguridad se han retirado tokens y datos personales del contenido mostrado aquí. Si quieres incluir las imágenes en el repo, súbelas a `docs/images/` y reemplaza los marcadores de imagen por los nombres de fichero.
-
-**Cabeceras comunes**
+**Cabeceras**
 - **Authorization (sesión o JWT interno):** `Authorization: Bearer <token_de_sesion>`
 - **Google token (acceso):** `X-Google-Token: <ACCESS_TOKEN_GOOGLE>` — solo para pruebas avanzadas o compatibilidad; el gateway puede inyectar el token de Google internamente.
 - **Google refresh (opcional):** `X-Google-Refresh: <REFRESH_TOKEN_GOOGLE>`
@@ -295,20 +286,6 @@ curl -X POST http://localhost:8000/google/refresh \
 
 ---
 
-**Incluir imágenes**
-- Si quieres que las capturas se muestren en este `pruebas.md`, súbelas a `docs/images/` y añade líneas como:
-
-```markdown
-![auth-me](images/auth-me.png)
-```
-
-Recomendación: no incluyas tokens reales ni emails personales en el repo. Usa valores de ejemplo o redacta los valores sensibles.
-
----
-
-Archivo generado: `docs/pruebas.md`
-
----
 
 **7) Thunder Client - Task Service**
 
@@ -616,16 +593,7 @@ Capturas requeridas para este flujo:
 
 - `PATCH /notificaciones/leer-todas` no requiere body.
 
-# Pruebas
 
-Este documento registra pruebas manuales para validar los flujos principales de Kairos.
-
-## Levantar servicios
-
-```bash
-docker compose build
-docker compose up
-```
 
 ## Verificar servicios
 
@@ -734,6 +702,12 @@ docker compose logs -f rabbitmq
 ![Credencial verificada](img/verify-credential.png)
 
 ![Token expirado](img/expired-token.png)
+
+![Conversion a Google Token](img/clerktoken-googletoken.png)
+
+![Conversion a token internto](img/clerktoken-kairostoken.png)
+
+![Prueba base de datos nuevo usuario de clerk](img/sincronizacion-clerkuser-kairos-user.png)
 
 ### Google Calendar
 
