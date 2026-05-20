@@ -297,6 +297,16 @@ async def proxy_auth_verify(request: Request):
     )
 
 
+@router.post("/auth/clerk/exchange")
+async def proxy_auth_clerk_exchange(request: Request):
+    return await proxy_request(
+        request,
+        base_url=settings.auth_service_url,
+        path="/auth/clerk/exchange",
+        timeout=settings.request_timeout_seconds,
+    )
+
+
 @router.get("/auth/users/search")
 async def proxy_auth_user_search(request: Request):
     return await proxy_request(

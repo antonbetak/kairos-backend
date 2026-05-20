@@ -85,6 +85,14 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class ClerkExchangeRequest(BaseModel):
+    clerk_token: str
+
+
+class ClerkExchangeResponse(TokenResponse):
+    user: UserResponse
+
+
 class TokenStatusRequest(BaseModel):
     token: str
 

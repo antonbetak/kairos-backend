@@ -1,7 +1,14 @@
+import json
 import re
 import secrets
+from datetime import datetime
+from datetime import timezone
 from threading import Thread
 import unicodedata
+from typing import Any
+from urllib.error import URLError
+from urllib.request import urlopen
+
 from fastapi import FastAPI
 from fastapi import Depends
 from fastapi import Header
@@ -9,6 +16,7 @@ from fastapi import HTTPException
 from fastapi import Response
 from fastapi import status
 from jose import JWTError
+from jose import jwt, jwk
 from jose.exceptions import ExpiredSignatureError
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -23,6 +31,8 @@ from app.database import SessionLocal
 from app.database import engine
 from app.schemas import TokenResponse
 from app.schemas import ClerkUserSync
+from app.schemas import ClerkExchangeRequest
+from app.schemas import ClerkExchangeResponse
 from app.schemas import UserCreate
 from app.schemas import UserLogin
 from app.schemas import PublicUserResponse
@@ -70,6 +80,11 @@ def _extract_bearer_token(authorization: str | None) -> str:
     return token
 
 
+CLERK_JWKS_CACHE: dict[str, Any] | None = None
+CLERK_JWKS_CACHE_AT: datetime | None = None
+CLERK_JWKS_CACHE_TTL_SECONDS = 3600
+
+
 def _slugify_handle(value: str) -> str:
     normalized = (
         unicodedata.normalize("NFKD", value)
@@ -108,6 +123,159 @@ def _normalize_requested_handle(value: str) -> str:
             status_code=400, detail="El handle debe tener al menos 3 caracteres"
         )
     return handle
+
+
+def _fetch_clerk_jwks() -> dict[str, Any] | None:
+    global CLERK_JWKS_CACHE, CLERK_JWKS_CACHE_AT
+    if not settings.clerk_jwks_url:
+        return None
+
+    now = datetime.now(timezone.utc)
+    if (
+        CLERK_JWKS_CACHE is not None
+        and CLERK_JWKS_CACHE_AT is not None
+        and (now - CLERK_JWKS_CACHE_AT).total_seconds() < CLERK_JWKS_CACHE_TTL_SECONDS
+    ):
+        return CLERK_JWKS_CACHE
+
+    try:
+        with urlopen(settings.clerk_jwks_url, timeout=10) as response:
+            raw = response.read()
+            jwks = json.loads(raw)
+    except (URLError, ValueError, OSError):
+        return CLERK_JWKS_CACHE
+
+    if not isinstance(jwks, dict) or "keys" not in jwks:
+        return CLERK_JWKS_CACHE
+
+    CLERK_JWKS_CACHE = jwks
+    CLERK_JWKS_CACHE_AT = now
+    return jwks
+
+
+def _verify_clerk_jwt(token: str) -> dict[str, Any]:
+    jwks = _fetch_clerk_jwks()
+    if not jwks:
+        raise HTTPException(
+            status_code=500,
+            detail="Clerk JWKS no está disponible; revisa CLERK_JWKS_URL",
+        )
+
+    try:
+        header = jwt.get_unverified_header(token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Clerk token inválido")
+
+    kid = header.get("kid")
+    if not kid:
+        raise HTTPException(status_code=401, detail="Clerk token inválido")
+
+    key_data = next(
+        (key for key in jwks.get("keys", []) if key.get("kid") == kid),
+        None,
+    )
+    if not key_data:
+        raise HTTPException(status_code=401, detail="Clerk token inválido")
+
+    algorithm = key_data.get("alg", "RS256")
+    try:
+        public_key = jwk.construct(key_data)
+        return jwt.decode(
+            token,
+            public_key,
+            algorithms=[algorithm],
+            options={"verify_aud": False},
+        )
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Clerk token expirado")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Clerk token inválido")
+
+
+def _profile_from_clerk_claims(payload: dict[str, Any]) -> dict[str, str | None]:
+    clerk_user_id = str(payload.get("sub") or payload.get("user_id") or "").strip()
+    if not clerk_user_id:
+        raise HTTPException(status_code=401, detail="Clerk token inválido")
+
+    email = str(
+        payload.get("email")
+        or payload.get("primary_email_address")
+        or payload.get("email_address")
+        or ""
+    ).strip().lower()
+
+    first_name = str(payload.get("first_name") or "").strip()
+    last_name = str(payload.get("last_name") or "").strip()
+    nombre = " ".join(part for part in (first_name, last_name) if part).strip()
+    if not nombre:
+        nombre = str(
+            payload.get("full_name") or payload.get("name") or ""
+        ).strip()
+    nombre = nombre or (email.split("@", 1)[0] if email else "")
+
+    return {
+        "clerk_id": clerk_user_id,
+        "email": email or None,
+        "nombre": nombre or None,
+    }
+
+
+def _find_or_create_user_by_email(
+    profile: dict[str, str | None], db: Session
+) -> models.User:
+    # Prefer lookup by clerk_id when available
+    clerk_id = profile.get("clerk_id")
+    if clerk_id:
+        user = db.execute(
+            select(models.User).where(models.User.clerk_id == clerk_id)
+        ).scalar_one_or_none()
+        if user:
+            # ensure handle and other fields are present
+            updated = False
+            if not user.handle:
+                user.handle = _generate_unique_handle(db, user.nombre, user.email)
+                updated = True
+            if updated:
+                db.commit()
+                db.refresh(user)
+            return user
+
+    # Fall back to email lookup/creation
+    email = profile.get("email")
+    user = db.execute(
+        select(models.User).where(models.User.email == email)
+    ).scalar_one_or_none()
+
+    if user:
+        updated = False
+        if clerk_id and not user.clerk_id:
+            user.clerk_id = clerk_id
+            updated = True
+        if not user.handle:
+            user.handle = _generate_unique_handle(db, user.nombre, user.email)
+            updated = True
+        if updated:
+            db.commit()
+            db.refresh(user)
+        return user
+
+    # Create new user when none found
+    nombre = str(profile.get("nombre") or (email or "").split("@", 1)[0]).strip()
+    user = models.User(
+        nombre=nombre or "Usuario Kairos",
+        email=email,
+        clerk_id=clerk_id,
+        handle=_generate_unique_handle(db, nombre, email),
+        password_hash=pwd_context.hash(secrets.token_urlsafe(32)),
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al crear usuario Clerk")
+    db.refresh(user)
+    return user
 
 
 def _get_user_from_authorization(
@@ -512,6 +680,43 @@ def verify_token(authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=401, detail="token invalido")
 
     return VerifyTokenResponse(valid=True, id_usuario=user_id, email=email)
+
+
+@app.post("/auth/clerk/exchange", response_model=ClerkExchangeResponse)
+def clerk_exchange(
+    payload: ClerkExchangeRequest,
+    db: Session = Depends(get_db),
+):
+    claims = _verify_clerk_jwt(payload.clerk_token)
+    clerk_id = str(claims.get("sub") or claims.get("user_id") or "").strip()
+    if not clerk_id:
+        raise HTTPException(status_code=401, detail="Clerk token inválido")
+
+    user = db.execute(
+        select(models.User).where(models.User.clerk_id == clerk_id)
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario Clerk no registrado")
+
+    session_id = create_token_session_id()
+    access_token, expires_in = create_access_token(
+        user_id=user.id_usuario,
+        email=user.email,
+        session_id=session_id,
+    )
+    refresh_token, refresh_expires_in = create_refresh_token(
+        user_id=user.id_usuario,
+        email=user.email,
+        session_id=session_id,
+    )
+
+    return ClerkExchangeResponse(
+        access_token=access_token,
+        expires_in=expires_in,
+        refresh_token=refresh_token,
+        refresh_expires_in=refresh_expires_in,
+        user=user,
+    )
 
 
 @app.post("/auth/token-status", response_model=TokenStatusResponse)

@@ -224,6 +224,7 @@ services:
     build:
       context: ./auth_service
     container_name: kairos-auth-service
+    env_file: ${ENV_FILE:-.env}
     environment:
       AUTH_DB_HOST: auth_postgres
       AUTH_DB_PORT: 5432

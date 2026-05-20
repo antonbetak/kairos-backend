@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     internal_service_token: str | None = None
     rabbitmq_url: str = "amqp://guest:guest@rabbitmq:5672/"
     google_sync_queue: str = "auth.google.sync"
+    clerk_jwks_url: str = ""
 
     @property
     def database_url(self) -> URL:
