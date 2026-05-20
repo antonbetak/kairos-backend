@@ -1,10 +1,10 @@
-"""RabbitMQ contracts for future Agent Service RAG flows.
+"""RabbitMQ publisher del agent-service.
 
-Recommendation publishing is intentionally pending until the agent logic exists.
+Publicación de recomendaciones proactivas pendiente de implementar
+una vez que el agente tenga suficiente historial por usuario.
 """
 
 from uuid import UUID
-
 
 PUBLISHED_EVENTS = ["Agent.RecommendationRequested"]
 
@@ -15,5 +15,5 @@ def publish_recommendation_requested(
     mensaje: str,
 ) -> None:
     raise NotImplementedError(
-        "Lógica RAG pendiente para publicación de recomendaciones"
+        "Publicación de recomendaciones proactivas pendiente de implementar."
     )
