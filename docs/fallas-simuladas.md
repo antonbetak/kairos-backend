@@ -1,5 +1,7 @@
 # Fallas simuladas
 
+Resumen: escenarios documentados para probar la resiliencia del sistema (fallos en infra y en proveedores externos), pasos reproducibles y verificación de resultados.
+
 Escenarios para probar resiliencia y tolerancia a fallos.
 
 ## 1. Caída de RabbitMQ
@@ -55,3 +57,18 @@ Cómo reproducir:
 Verificar:
 - `GET /auth/me` con token expirado → `401`.  
 - `POST /auth/refresh` con `refresh_token` válido → nuevos tokens.
+
+## 5. Fallo en servicio de terceros: Clerk
+
+Objetivo: comprobar el comportamiento cuando la verificación del token de Clerk o la llamada a la API de Clerk (para obtener `oauth_access_tokens/google`) falla.
+
+Cómo reproducir:
+
+```bash
+# Simular JWKS no disponible o respuesta 500 desde Clerk
+```
+
+Verificar:
+- El gateway debe responder 502/504 o un error claro y no crear usuarios Kairos automáticamente.
+- Las llamadas a `POST /auth/clerk/sync` deben fallar de forma controlada si Clerk no puede verificarse.
+- Los logs deben contener trazas para facilitar reintentos manuales.

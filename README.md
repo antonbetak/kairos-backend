@@ -1,3 +1,139 @@
+# Kairos — Backend
+
+Nombre del proyecto: Kairos (backend)
+
+Nombre de la startup/equipo: Kairos Team
+
+Integrantes y roles:
+
+- Moisés Rodríguez — Lead Backend (placeholder)
+- [Nombre] — DevOps / Infra
+- [Nombre] — Frontend
+- [Nombre] — QA
+
+Reemplaza los nombres/roles anteriores por los reales del equipo.
+
+Descripción del problema
+
+Las aplicaciones modernas necesitan centralizar autenticación, sincronizar datos con proveedores externos (Google Calendar / Fit) y orquestar lógica de dominio (tareas, horarios, notificaciones) en servicios desacoplados. Gestionar identidad delegada (Clerk) y tokens de recursos externos requiere una estrategia clara para evitar fugas de credenciales y creación accidental de cuentas.
+
+Descripción de la solución
+
+Kairos es un backend basado en microservicios que ofrece:
+
+- Un API Gateway que centraliza autenticación, validación de tokens de terceros (Clerk) y ruteo.
+- Servicios especializados (auth_service, google_auth, calendar_service, task_service, schedule_service, notifications_service, stats_service, activity_service, etc.).
+- Comunicación asíncrona por RabbitMQ para sincronización y eventos de dominio.
+- Flujos explícitos para sincronizar usuarios al iniciar sesión con Clerk (`POST /auth/clerk/sync`) y un intercambio controlado (`POST /auth/clerk/exchange`).
+
+Arquitectura general
+
+Ver `docs/arquitectura.md` para el diagrama y descripción detallada. En resumen:
+
+- API Gateway expone el puerto 8000.
+- Servicios internos se comunican entre sí por HTTP interno y eventos a través de RabbitMQ.
+- `auth_service` gestiona la identidad y emite JWTs Kairos.
+
+Tecnologías utilizadas
+
+- Python 3.12
+- FastAPI, Uvicorn
+- SQLAlchemy, PostgreSQL
+- RabbitMQ (pika)
+- Redis (cache/session según servicio)
+- Docker / Docker Compose
+- PyJWT / python-jose para JWT
+- Clerk (autenticación delegada) y Google APIs (Calendar, Fitness)
+
+Instrucciones de instalación
+
+Requisitos: Docker, Docker Compose, Python 3.12 (para desarrollo local).
+
+1. Clona el repositorio:
+
+```bash
+git clone <repo-url>
+cd kairos-backend
+```
+
+2. (Opcional) Crear y activar virtualenv para pruebas unitarias locales:
+
+```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1  # PowerShell
+```
+
+3. Levantar stack con Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Instrucciones de ejecución
+
+- El gateway estará disponible en `http://localhost:8000`.
+- Para ejecutar solo un servicio en local, entra al directorio del servicio y ejecuta con Uvicorn, p. ej:
+
+```bash
+cd auth_service
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload --port 8001
+```
+
+Variables de entorno (principales)
+
+Lista mínima (configurar en `.env` o en entorno del contenedor):
+
+- `DATABASE_URL` — URL de Postgres (ej. `postgresql://user:pass@postgres:5432/db`)
+- `RABBITMQ_URL` — URL de RabbitMQ
+- `REDIS_URL` — URL de Redis
+- `JWT_SECRET` — secreto para firmar JWT Kairos
+- `AUTH_INTERNAL_TOKEN` — secreto usado por el gateway para llamadas internas a `auth_service`
+- `CLERK_SECRET_KEY` — secreto de Clerk para llamadas al backend de Clerk
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — para flujos OAuth si aplica
+- `RUN_E2E_TESTS` — si está a `1` habilita pruebas E2E en CI/local
+
+Endpoints principales
+
+Ver `docs/api.md` para lista completa. Resumen:
+
+- `POST /auth/clerk/sync` — sincroniza/crea usuario Kairos tras login con Clerk.
+- `POST /auth/clerk/exchange` — intercambio Clerk→Kairos (solo si `clerk_id` existe).
+- `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh`, `GET /auth/me`
+- `GET/POST/PUT/DELETE /google/...` — proxy a calendar_service con token de Google inyectado desde Clerk cuando aplica.
+- `GET/POST/PATCH/DELETE /tasks`, `/schedule`, `/notificaciones`
+
+Eventos principales
+
+Ver `docs/eventos.md` para contratos. Incluye:
+
+- `Task.Created`, `Task.Completed`, `Task.DueWarning`, `Schedule.Created`, `Schedule.Updated`, etc.
+- RPC/evento de sincronización: `auth.google.sync` (google_auth → auth_service), payload puede incluir `clerk_id`.
+
+Evidencias de pruebas
+
+Ver `docs/Pruebas.md` para pasos reproducibles, ejemplos de curl y cómo ejecutar pruebas unitarias y E2E (usar `RUN_E2E_TESTS=1`).
+
+Fallas simuladas
+
+Escenarios documentados en `docs/fallas-simuladas.md` (RabbitMQ down, Postgres down, expiración de tokens, errores en Clerk/Google API).
+
+Lecciones aprendidas
+
+- Separar autenticación delegada (Clerk) de la entidad de usuario de la aplicación evita inconsistencias y fugas de tokens.
+- Mantener un endpoint explícito para sincronización (`/auth/clerk/sync`) proporciona claridad y evita efectos secundarios inesperados en endpoints proxy.
+- Preferir mensajes idempotentes y `request_id` para operaciones que publican eventos.
+- Tests que crean y limpian recursos descubren bugs de integración más eficientemente que pruebas de importación/smoke.
+
+Contribuir
+
+1. Crea una rama `feature/mi-cambio`.
+2. Haz commits descriptivos y abre un PR contra `main`.
+3. Añade pruebas cuando modifiques comportamiento crítico (auth, sync, eventos).
+
+Contacto
+
+Para preguntas técnicas: equipo Kairos (canal interno / correo).
 # API Gateway
 
 El **API Gateway** es el unico punto de entrada expuesto. Todos los microservicios quedan en red interna.

@@ -1,5 +1,13 @@
 # Requerimientos
 
+## Pre-requisitos de desarrollo
+
+- Python 3.12 recomendado (el proyecto se desarrolló y probó con Python 3.12 en servicios principales)
+
+# Requerimientos
+
+Resumen: lista de requerimientos funcionales y no funcionales del proyecto, dependencias externas y pre-requisitos para desarrollo y despliegue.
+
 ## Requerimientos funcionales
 
 - Registrar usuarios y autenticarlos (email/password + JWT).
@@ -20,12 +28,14 @@
 ## Pre-requisitos de desarrollo
 
 - Docker y Docker Compose
-- Python 3.10+ (para desarrollo local sin Docker)
+- Python 3.12 recomendado (para desarrollo local)
 - make / task runner opcional
 
 ## Dependencias externas
 
 - Google APIs (OAuth2, Calendar, Fitness)
 - RabbitMQ
+- PostgreSQL
+- Redis (opcional según servicio)
 - PostgreSQL
 - Redis (opcional según servicio)

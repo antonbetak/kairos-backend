@@ -1,5 +1,7 @@
 # Modelo de datos (resumen)
 
+Resumen: descripción consolidada de las entidades principales del sistema (usuarios, tareas, schedules, notificaciones) y los campos relevantes que usan los distintos servicios. No sustituye los esquemas de cada servicio, pero sirve como referencia global para integraciones y migraciones.
+
 Este documento describe las entidades principales y sus campos más relevantes. No sustituye el esquema de la base de datos en cada servicio, sino que ofrece una visión global.
 
 ## Usuario (`users` / `auth_service`)
@@ -8,6 +10,9 @@ Este documento describe las entidades principales y sus campos más relevantes. 
 - `nombre` (string)
 - `email` (string, único)
 - `password_hash` (string)
+- `clerk_id` (string, nullable, único) — identificador de usuario en Clerk cuando aplica
+- `handle` (string, único) — identificador público generado
+- `avatar_url` (string, nullable)
 - `created_at`, `updated_at` (timestamps)
 
 ## Tarea (`tasks` / `task_service`)
