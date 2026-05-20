@@ -221,11 +221,57 @@ async def _verify_legacy_kairos_token(token: str) -> dict[str, Any] | None:
     return None
 
 
+def is_clerk_token(token: str) -> bool:
+    try:
+        header = jwt.get_unverified_header(token)
+    except Exception:
+        return False
+
+    alg = str(header.get("alg") or "").upper()
+    kid = header.get("kid")
+    return alg.startswith("RS") and bool(kid)
+
+
+async def get_clerk_id_from_token(token: str) -> str | None:
+    if not is_clerk_token(token):
+        return None
+
+    try:
+        signing_key = _jwks_client().get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_aud": False},
+            leeway=60,
+        )
+    except Exception as exc:
+        logger.debug("Clerk token decode failed in get_clerk_id_from_token: %s", exc)
+        return None
+
+    clerk_user_id = str(payload.get("sub") or payload.get("user_id") or "").strip()
+    return clerk_user_id or None
+
+
 async def verify_token(token: str) -> dict[str, Any] | None:
+    is_clerk_token = False
+    try:
+        header = jwt.get_unverified_header(token)
+        alg = str(header.get("alg") or "").upper()
+        kid = header.get("kid")
+        if alg.startswith("RS") and kid:
+            is_clerk_token = True
+    except Exception:
+        is_clerk_token = False
+
     clerk_profile = await _decode_clerk_token(token)
     if clerk_profile:
         kairos_user = await _sync_clerk_user(clerk_profile)
         if kairos_user:
             return kairos_user
+
+    if is_clerk_token:
+        logger.debug("Token appears to be Clerk-issued and did not decode correctly; skipping legacy Kairos verify.")
+        return None
 
     return await _verify_legacy_kairos_token(token)

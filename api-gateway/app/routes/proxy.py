@@ -5,6 +5,8 @@ import logging
 
 from app.config import get_settings
 from app.dependencies.auth import obtener_usuario_actual
+from app.services.auth_client import get_clerk_id_from_token
+from app.services.auth_client import is_clerk_token
 from app.services.clerk_google_token_service import (
     ClerkGoogleTokenService,
     get_clerk_google_token_service,
@@ -143,10 +145,32 @@ async def _fetch_google_headers_for_clerk(
     clerk_service: ClerkGoogleTokenService,
 ) -> dict[str, str]:
     logger = logging.getLogger("api_gateway.proxy")
-    user = await _require_clerk_user(authorization)
-    clerk_id = user["clerk_id"]
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header with Clerk or internal token is required.",
+        )
 
-    logger.debug("Attempting Clerk auth lookup from Authorization header.")
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header with Clerk or internal token is required.",
+        )
+
+    clerk_id: str | None = None
+    if is_clerk_token(token):
+        clerk_id = await get_clerk_id_from_token(token)
+        if not clerk_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Clerk token.",
+            )
+    else:
+        user = await _require_clerk_user(authorization)
+        clerk_id = user["clerk_id"]
+
+    logger.debug("Attempting Clerk auth lookup for clerk_id=%s.", clerk_id)
     token_data = await clerk_service.get_google_access_token(clerk_id)
 
     # Log injection event for testing
