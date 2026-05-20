@@ -17,6 +17,33 @@ class TaskCreatedEvent(BaseModel):
     timestamp: datetime
 
 
+class TaskCompletedEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "Task.Completed"
+    id_usuario: str
+    id_tarea: UUID
+    titulo: str
+    tipo: str | None = None
+    fecha_inicio: datetime | None = None
+    fecha_fin: datetime | None = None
+    completada_en: datetime | None = None
+    timestamp: datetime
+
+
+class TaskDitchEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "Task.Ditch"
+    id_usuario: str
+    id_tarea: UUID
+    titulo: str
+    tipo: str | None = None
+    timestamp: datetime
+
+
 class ScheduleCreatedEvent(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -30,9 +57,83 @@ class ScheduleCreatedEvent(BaseModel):
     timestamp: datetime
 
 
-class RecommendationRequest(BaseModel):
-    id_usuario: UUID
-    context: str
+class ScheduleBlockAcceptedEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "Schedule.BlockAccepted"
+    id_usuario: str
+    id_bloque: UUID
+    titulo: str
+    tipo: str | None = None
+    hora_inicio: datetime | None = None
+    hora_fin: datetime | None = None
+    timestamp: datetime
+
+
+class ScheduleBlockRejectedEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "Schedule.BlockRejected"
+    id_usuario: str
+    id_bloque: UUID
+    titulo: str
+    tipo: str | None = None
+    hora_inicio: datetime | None = None
+    hora_fin: datetime | None = None
+    timestamp: datetime
+
+
+class StatsSummaryEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "Stats.SummaryGenerated"
+    id_usuario: str
+    periodo: str
+    fecha_inicio: date
+    total_actividades: int = 0
+    completadas: int = 0
+    tiempo_productivo_min: int = 0
+    puntuacion_productividad: float = 0.0
+    timestamp: datetime
+
+
+class GoogleFitSleepEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "GoogleFit.SleepSynced"
+    id_usuario: str
+    fecha: date
+    duracion_min: int
+    calidad: str | None = None  # 'bueno' | 'regular' | 'malo'
+    timestamp: datetime
+
+
+class GoogleFitActivityEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "GoogleFit.ActivitySynced"
+    id_usuario: str
+    fecha: date
+    pasos: int = 0
+    calorias: int = 0
+    minutos_activos: int = 0
+    timestamp: datetime
+
+
+class CalendarEventsUpdatedEvent(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    event_id: str
+    event_type: str = "Calendar.EventsUpdated"
+    id_usuario: str
+    fecha: date
+    eventos: list[dict] = Field(default_factory=list)
+    timestamp: datetime
 
 
 class RecommendationEvent(BaseModel):
@@ -44,6 +145,13 @@ class RecommendationEvent(BaseModel):
     titulo: str
     mensaje: str
     timestamp: datetime
+
+
+class EventoCalendario(BaseModel):
+    titulo: str
+    inicio: datetime
+    fin: datetime
+    descripcion: str | None = None
 
 
 class TareaContexto(BaseModel):
@@ -78,9 +186,11 @@ class GenerateRequest(BaseModel):
     tareas: list[TareaContexto] = Field(default_factory=list)
     metas: list[MetaContexto] = Field(default_factory=list)
     streaks: list[StreakContexto] = Field(default_factory=list)
+    eventos_calendario: list[EventoCalendario] = Field(default_factory=list)
 
 
 TipoBloque = Literal["tarea", "habito", "evento", "libre"]
+
 
 class BloqueAgente(BaseModel):
     titulo: str
