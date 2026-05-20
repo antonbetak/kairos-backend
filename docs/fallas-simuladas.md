@@ -90,12 +90,27 @@ curl -X GET http://localhost:8000/tasks \
 - Cuando `task_postgres` vuelve a iniciar, el servicio recupera su operación normal.
 - No se crean registros corruptos o incompletos durante la falla.
 
-### Evidencia sugerida
+### Evidencia tomada
 
-- Captura del comando `docker compose stop task_postgres`.
-- Captura de Thunder Client o terminal mostrando error al llamar `/tasks`.
-- Captura de logs de `task_service`.
-- Captura posterior mostrando que `/tasks` vuelve a responder al reiniciar `task_postgres`.
+Registro del usuario de prueba:
+
+![Registrar usuario](<img/registrar usuario.png>)
+
+Base de datos funcionando antes de la falla:
+
+![Base de datos exitosa nuevamente](<img/base de datos exitosa nuevamente.png>)
+
+Detención de la base de datos:
+
+![Parar base de datos](<img/parar base de datos.png>)
+
+Error al consultar tareas con la base de datos detenida:
+
+![Error en base de datos](<img/error en base de datos.png>)
+
+Logs del servicio mostrando el error de conexión:
+
+![Logs de task service](img/logs.png)
 
 ---
 
