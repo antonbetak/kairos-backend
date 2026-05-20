@@ -14,7 +14,7 @@ from urllib.request import urlopen
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 from types import ModuleType
-
+from fastapi.testclient import TestClient
 
 fake_pika = ModuleType("pika")
 fake_pika.URLParameters = object
@@ -22,7 +22,7 @@ fake_pika.BlockingConnection = object
 fake_pika.BasicProperties = object
 sys.modules.setdefault("pika", fake_pika)
 
-from fastapi.testclient import TestClient
+
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]

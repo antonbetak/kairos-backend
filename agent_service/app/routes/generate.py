@@ -4,7 +4,7 @@ import json
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from langchain_core.messages import HumanMessage
 
 from app.agent.graph import graph
