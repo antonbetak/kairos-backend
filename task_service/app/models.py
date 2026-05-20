@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import Boolean
 from sqlalchemy import Column
 from sqlalchemy import DateTime
+from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Text
 from sqlalchemy import func
@@ -23,6 +24,9 @@ class Tarea(Base):
     id_usuario = Column(String(255), nullable=False, index=True)
     titulo = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
+    tipo = Column(String(50), default="libre", nullable=False)
+    prioridad = Column(Integer, default=0, nullable=False)
+    estado = Column(String(50), default="pendiente", nullable=False)
     completada = Column(Boolean, default=False, nullable=False)
     due_at = Column(DateTime(timezone=True), nullable=True)
     due_warning_sent_at = Column(DateTime(timezone=True), nullable=True)

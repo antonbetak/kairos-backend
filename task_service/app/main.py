@@ -34,6 +34,9 @@ from app.services.due_warning import iniciar_verificador_vencimientos
 app = FastAPI(title="Kairos Task Service")
 logger = logging.getLogger(__name__)
 
+TIPOS_TAREA_VALIDOS = {"tarea", "habito", "evento", "libre"}
+ESTADOS_TAREA_VALIDOS = {"pendiente", "completada", "abandonada"}
+
 
 def _ensure_request_id_column() -> None:
     with engine.begin() as connection:
@@ -50,8 +53,55 @@ def _ensure_request_id_column() -> None:
             "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS due_expired_sent_at TIMESTAMPTZ"
         )
         connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS tipo VARCHAR(50) NOT NULL DEFAULT 'libre'"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS prioridad INTEGER NOT NULL DEFAULT 0"
+        )
+        connection.exec_driver_sql(
+            "ALTER TABLE IF EXISTS tareas ADD COLUMN IF NOT EXISTS estado VARCHAR(50) NOT NULL DEFAULT 'pendiente'"
+        )
+        connection.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_tareas_request_id ON tareas (request_id)"
         )
+
+
+def _normalizar_tipo(tipo: str | None) -> str:
+    if tipo in TIPOS_TAREA_VALIDOS:
+        return tipo
+    return "libre"
+
+
+def _normalizar_prioridad(prioridad: int | None) -> int:
+    if prioridad in {0, 1, 2}:
+        return prioridad
+    return 0
+
+
+def _normalizar_estado(estado: str | None) -> str:
+    if estado in ESTADOS_TAREA_VALIDOS:
+        return estado
+    return "pendiente"
+
+
+def _estado_a_completada(estado: str) -> bool:
+    return estado == "completada"
+
+
+def _aplicar_estado_y_completada(
+    tarea,
+    *,
+    estado: str | None = None,
+    completada: bool | None = None,
+) -> None:
+    if estado is not None:
+        tarea.estado = _normalizar_estado(estado)
+        tarea.completada = _estado_a_completada(tarea.estado)
+        return
+
+    if completada is not None:
+        tarea.completada = completada
+        tarea.estado = "completada" if completada else "pendiente"
 
 
 def _log_event(event_type: str, status: str, message: str, **fields):
@@ -214,9 +264,13 @@ def crear_tarea(
         id_usuario=id_usuario,
         titulo=tarea.titulo,
         descripcion=tarea.descripcion,
+        tipo=_normalizar_tipo(tarea.tipo),
+        prioridad=_normalizar_prioridad(tarea.prioridad),
+        estado=_normalizar_estado(tarea.estado),
         completada=False,
         due_at=tarea.due_at,
     )
+    nueva_tarea.completada = _estado_a_completada(nueva_tarea.estado)
 
     try:
         db.add(nueva_tarea)
@@ -286,10 +340,18 @@ def actualizar_tarea(
 
     estaba_completada = tarea.completada
     try:
-        tarea.completada = datos.completada
-        if datos.due_at is not None:
+        if "due_at" in datos.model_fields_set:
             tarea.due_at = datos.due_at
             tarea.due_warning_sent_at = None
+            tarea.due_expired_sent_at = None
+        if "tipo" in datos.model_fields_set:
+            tarea.tipo = _normalizar_tipo(datos.tipo)
+        if "prioridad" in datos.model_fields_set:
+            tarea.prioridad = _normalizar_prioridad(datos.prioridad)
+        if "estado" in datos.model_fields_set:
+            _aplicar_estado_y_completada(tarea, estado=datos.estado)
+        elif "completada" in datos.model_fields_set:
+            _aplicar_estado_y_completada(tarea, completada=bool(datos.completada))
         db.commit()
         db.refresh(tarea)
     except Exception as error:

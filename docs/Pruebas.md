@@ -41,6 +41,35 @@ curl -X POST http://localhost:8000/tasks \
   - El gateway inyecta internamente el token de Google desde Clerk para Calendar/Fit.
   - Evento creado en Google Calendar sin exponer el Google access token al frontend.
 
+## Prueba: nuevos campos de tarea y sincronización de estado
+
+1. Crear una tarea con `tipo`, `prioridad` y `estado` opcionales:
+
+```bash
+curl -X POST http://localhost:8000/tasks \
+  -H "Authorization: Bearer <token_de_sesion>" \
+  -H "Content-Type: application/json" \
+  -d '{"titulo":"Llamar al cliente","descripcion":"Confirmar agenda","tipo":"evento","prioridad":2,"estado":"completada","due_at":"2026-05-17T18:30:00Z"}'
+```
+
+2. Verificar en la respuesta y en la tabla `tareas`:
+   - `tipo` acepta `tarea`, `habito`, `evento` y `libre`.
+   - `prioridad` acepta `0`, `1` y `2`.
+   - `estado` acepta `pendiente`, `completada` y `abandonada`.
+   - Si `estado = "completada"`, entonces `completada = true`.
+   - Si `estado = "pendiente"` o `estado = "abandonada"`, entonces `completada = false`.
+
+3. Actualizar por PATCH solo los campos necesarios:
+
+```bash
+curl -X PATCH http://localhost:8000/tasks/<id_tarea> \
+  -H "Authorization: Bearer <token_de_sesion>" \
+  -H "Content-Type: application/json" \
+  -d '{"estado":"abandonada","prioridad":1,"tipo":"libre"}'
+```
+
+4. Confirmar que el PATCH también puede modificar `completada`, `due_at`, `tipo`, `prioridad` y `estado`, y que `completada` queda sincronizado con `estado`.
+
 ## Prueba: notificaciones por eventos
 
 1. Crear tarea que dispare `Task.DueWarning` o `Task.Due` (usar `due_at` apropiado).
