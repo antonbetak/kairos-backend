@@ -23,8 +23,6 @@ fake_pika.BasicProperties = object
 sys.modules.setdefault("pika", fake_pika)
 
 
-
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 GOOGLE_AUTH_ROOT = REPO_ROOT / "google_auth"
 if str(GOOGLE_AUTH_ROOT) not in sys.path:

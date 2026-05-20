@@ -48,8 +48,12 @@ class GoogleTokenSaveService:
 
     async def _verify_google_access_token(self, access_token: str) -> None:
         headers = {"Authorization": f"Bearer {access_token}"}
-        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
-            response = await client.get(self.settings.google_userinfo_uri, headers=headers)
+        async with httpx.AsyncClient(
+            timeout=self.settings.request_timeout_seconds
+        ) as client:
+            response = await client.get(
+                self.settings.google_userinfo_uri, headers=headers
+            )
 
         if response.status_code >= 400:
             raise HTTPException(
@@ -68,7 +72,9 @@ class GoogleTokenSaveService:
             "access_token": access_token,
             "refresh_token": refresh_token,
         }
-        async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=self.settings.request_timeout_seconds
+        ) as client:
             response = await client.post(url, json=payload)
 
         if response.status_code < 400:

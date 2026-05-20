@@ -43,6 +43,7 @@ extractor_procedimental = create_extractor(
     tool_choice="ActualizarMemoria",
 )
 
+
 def _cargar_memoria(store: BaseStore, id_usuario: str, tipo: str) -> str:
     """Carga memorias del InMemoryStore de LangGraph."""
     mems = store.search((tipo, id_usuario))
@@ -64,9 +65,9 @@ def _enriquecer_desde_chroma(id_usuario: str, tipo: str, query: str) -> str:
 
 def _formatear_tarea(t: dict) -> str:
     linea = f"- [{t.get('tipo', 'tarea')}] {t.get('titulo', '')}"
-    if t.get('fecha_limite'):
+    if t.get("fecha_limite"):
         linea += f" (límite: {t.get('fecha_limite')})"
-    if t.get('duracion_estimada_min'):
+    if t.get("duracion_estimada_min"):
         linea += f" (~{t.get('duracion_estimada_min')} min)"
     return linea
 
@@ -78,22 +79,33 @@ def _formatear_contexto(request_data: dict) -> dict:
     eventos = request_data.get("eventos_calendario", [])
     fecha = request_data.get("fecha", "hoy")
 
-    tareas_str = "\n".join(_formatear_tarea(t) for t in tareas) or "Sin tareas pendientes."
+    tareas_str = (
+        "\n".join(_formatear_tarea(t) for t in tareas) or "Sin tareas pendientes."
+    )
 
-    metas_str = "\n".join(
-        f"- {m.get('titulo')} ({m.get('progreso_pct', 0):.0f}% completada)"
-        for m in metas
-    ) or "Sin metas activas."
+    metas_str = (
+        "\n".join(
+            f"- {m.get('titulo')} ({m.get('progreso_pct', 0):.0f}% completada)"
+            for m in metas
+        )
+        or "Sin metas activas."
+    )
 
-    streaks_str = "\n".join(
-        f"- {s.get('tipo_habito')}: racha actual {s.get('racha_actual')} días (máx {s.get('racha_maxima')})"
-        for s in streaks
-    ) or "Sin streaks activos."
+    streaks_str = (
+        "\n".join(
+            f"- {s.get('tipo_habito')}: racha actual {s.get('racha_actual')} días (máx {s.get('racha_maxima')})"
+            for s in streaks
+        )
+        or "Sin streaks activos."
+    )
 
-    eventos_str = "\n".join(
-        f"- {e.get('titulo')} de {e.get('inicio')} a {e.get('fin')}"
-        for e in eventos
-    ) or "Sin eventos en Google Calendar para hoy."
+    eventos_str = (
+        "\n".join(
+            f"- {e.get('titulo')} de {e.get('inicio')} a {e.get('fin')}"
+            for e in eventos
+        )
+        or "Sin eventos en Google Calendar para hoy."
+    )
 
     return {
         "fecha": str(fecha),
@@ -169,16 +181,17 @@ def actualizar_semantica(
     items_existentes = store.search(namespace)
     memorias_existentes = (
         [(item.key, "ActualizarMemoria", item.value) for item in items_existentes]
-        if items_existentes else None
+        if items_existentes
+        else None
     )
 
-    instruccion = INSTRUCCION_ACTUALIZAR_MEMORIA.format(
-        hora=datetime.now().isoformat()
+    instruccion = INSTRUCCION_ACTUALIZAR_MEMORIA.format(hora=datetime.now().isoformat())
+    resultado = extractor_semantica.invoke(
+        {
+            "messages": [SystemMessage(content=instruccion)] + state["messages"][:-1],
+            "existing": memorias_existentes,
+        }
     )
-    resultado = extractor_semantica.invoke({
-        "messages": [SystemMessage(content=instruccion)] + state["messages"][:-1],
-        "existing": memorias_existentes,
-    })
 
     for r, rmeta in zip(resultado["responses"], resultado["response_metadata"]):
         key = rmeta.get("json_doc_id", str(uuid.uuid4()))
@@ -193,7 +206,15 @@ def actualizar_semantica(
         )
 
     tool_call_id = state["messages"][-1].tool_calls[0]["id"]
-    return {"messages": [{"role": "tool", "content": "memoria semántica actualizada", "tool_call_id": tool_call_id}]}
+    return {
+        "messages": [
+            {
+                "role": "tool",
+                "content": "memoria semántica actualizada",
+                "tool_call_id": tool_call_id,
+            }
+        ]
+    }
 
 
 def actualizar_episodica(
@@ -208,16 +229,17 @@ def actualizar_episodica(
     items_existentes = store.search(namespace)
     memorias_existentes = (
         [(item.key, "ActualizarMemoria", item.value) for item in items_existentes]
-        if items_existentes else None
+        if items_existentes
+        else None
     )
 
-    instruccion = INSTRUCCION_ACTUALIZAR_MEMORIA.format(
-        hora=datetime.now().isoformat()
+    instruccion = INSTRUCCION_ACTUALIZAR_MEMORIA.format(hora=datetime.now().isoformat())
+    resultado = extractor_semantica.invoke(
+        {
+            "messages": [SystemMessage(content=instruccion)] + state["messages"][:-1],
+            "existing": memorias_existentes,
+        }
     )
-    resultado = extractor_semantica.invoke({
-        "messages": [SystemMessage(content=instruccion)] + state["messages"][:-1],
-        "existing": memorias_existentes,
-    })
 
     for r, rmeta in zip(resultado["responses"], resultado["response_metadata"]):
         key = rmeta.get("json_doc_id", str(uuid.uuid4()))
@@ -231,7 +253,15 @@ def actualizar_episodica(
         )
 
     tool_call_id = state["messages"][-1].tool_calls[0]["id"]
-    return {"messages": [{"role": "tool", "content": "memoria episódica actualizada", "tool_call_id": tool_call_id}]}
+    return {
+        "messages": [
+            {
+                "role": "tool",
+                "content": "memoria episódica actualizada",
+                "tool_call_id": tool_call_id,
+            }
+        ]
+    }
 
 
 def actualizar_procedimental(
@@ -245,20 +275,25 @@ def actualizar_procedimental(
 
     items_existentes = store.search(namespace)
     instrucciones_actuales = (
-        items_existentes[0].value.get("contenido", "")
-        if items_existentes else ""
+        items_existentes[0].value.get("contenido", "") if items_existentes else ""
     )
 
     instruccion = INSTRUCCION_PROCEDIMENTAL.format(
         instrucciones_actuales=instrucciones_actuales
     )
-    resultado = extractor_procedimental.invoke({
-        "messages": [SystemMessage(content=instruccion)] + state["messages"][:-1],
-        "existing": (
-            [(item.key, "ActualizarMemoria", item.value) for item in items_existentes]
-            if items_existentes else None
-        ),
-    })
+    resultado = extractor_procedimental.invoke(
+        {
+            "messages": [SystemMessage(content=instruccion)] + state["messages"][:-1],
+            "existing": (
+                [
+                    (item.key, "ActualizarMemoria", item.value)
+                    for item in items_existentes
+                ]
+                if items_existentes
+                else None
+            ),
+        }
+    )
 
     for r, rmeta in zip(resultado["responses"], resultado["response_metadata"]):
         key = rmeta.get("json_doc_id", str(uuid.uuid4()))
@@ -272,15 +307,28 @@ def actualizar_procedimental(
         )
 
     tool_call_id = state["messages"][-1].tool_calls[0]["id"]
-    return {"messages": [{"role": "tool", "content": "memoria procedimental actualizada", "tool_call_id": tool_call_id}]}
+    return {
+        "messages": [
+            {
+                "role": "tool",
+                "content": "memoria procedimental actualizada",
+                "tool_call_id": tool_call_id,
+            }
+        ]
+    }
 
 
 def enrutar_mensaje(
     state: MessagesState,
     config: RunnableConfig,
     store: BaseStore,
-) -> Literal["actualizar_semantica", "actualizar_episodica",
-             "actualizar_procedimental", "tools", "__end__"]:
+) -> Literal[
+    "actualizar_semantica",
+    "actualizar_episodica",
+    "actualizar_procedimental",
+    "tools",
+    "__end__",
+]:
     """
     Decide a dónde va el flujo después del nodo principal:
     - Si el agente quiere actualizar memoria → nodo correspondiente

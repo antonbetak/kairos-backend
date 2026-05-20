@@ -18,8 +18,12 @@ from app.agent.nodes import (
 
 logger = logging.getLogger(__name__)
 
-store = InMemoryStore() # memoria de sesión (se complementa con ChromaDB para persistencia)
-checkpointer = MemorySaver() # checkpointer para mantener el estado del grafo entre llamadas
+store = (
+    InMemoryStore()
+)  # memoria de sesión (se complementa con ChromaDB para persistencia)
+checkpointer = (
+    MemorySaver()
+)  # checkpointer para mantener el estado del grafo entre llamadas
 
 
 def build_graph():

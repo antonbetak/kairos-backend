@@ -34,7 +34,9 @@ def get_chroma_client() -> chromadb.HttpClient:
             port=settings.chroma_port,
             settings=ChromaSettings(anonymized_telemetry=False),
         )
-        logger.info("ChromaDB conectado en %s:%s", settings.chroma_host, settings.chroma_port)
+        logger.info(
+            "ChromaDB conectado en %s:%s", settings.chroma_host, settings.chroma_port
+        )
     return _chroma_client
 
 
@@ -110,7 +112,10 @@ def buscar_por_tipo(
         docs = [r.page_content for r in resultados]
         logger.info(
             "ChromaDB [%s] query '%s' → %d docs para usuario %s",
-            tipo_memoria, query, len(docs), id_usuario,
+            tipo_memoria,
+            query,
+            len(docs),
+            id_usuario,
         )
         return docs
     except Exception as e:

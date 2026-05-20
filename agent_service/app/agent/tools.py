@@ -19,8 +19,7 @@ class BloqueHorario(BaseModel):
         description="Tipo de bloque"
     )
     razon: str | None = Field(
-        default=None,
-        description="Por qué se propone este bloque en este horario"
+        default=None, description="Por qué se propone este bloque en este horario"
     )
 
 
@@ -51,6 +50,7 @@ class ActualizarMemoria(BaseModel):
     Actualiza uno de los tres tipos de memoria del usuario en ChromaDB.
     Úsala cuando detectes información relevante sobre el usuario que deba recordarse.
     """
+
     tipo: Literal["semantica", "episodica", "procedimental"] = Field(
         description=(
             "semantica: perfil, metas, hábitos a largo plazo. "
@@ -58,6 +58,4 @@ class ActualizarMemoria(BaseModel):
             "procedimental: preferencias de horario aprendidas de accept/reject."
         )
     )
-    contenido: str = Field(
-        description="Texto descriptivo del patrón o dato a recordar"
-    )
+    contenido: str = Field(description="Texto descriptivo del patrón o dato a recordar")

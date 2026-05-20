@@ -35,7 +35,9 @@ class AuthSyncBusClient:
                 queue=self.settings.auth_google_sync_queue,
                 durable=True,
             )
-            callback_queue = channel.queue_declare(queue="", exclusive=True).method.queue
+            callback_queue = channel.queue_declare(
+                queue="", exclusive=True
+            ).method.queue
 
             def on_response(ch, method, props, body):
                 nonlocal response_body
@@ -85,10 +87,14 @@ class AuthSyncBusClient:
             if not response.get("ok"):
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=str(response.get("error") or "Fallo sincronizando usuario Kairos."),
+                    detail=str(
+                        response.get("error") or "Fallo sincronizando usuario Kairos."
+                    ),
                 )
 
-            kairos_user = KairosUserProfile.model_validate(response.get("kairos_user") or {})
+            kairos_user = KairosUserProfile.model_validate(
+                response.get("kairos_user") or {}
+            )
             kairos_tokens = KairosTokenSet.model_validate(
                 response.get("kairos_tokens") or {}
             )

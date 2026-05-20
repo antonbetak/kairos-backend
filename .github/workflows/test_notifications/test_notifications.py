@@ -54,7 +54,9 @@ class FakeQuery:
         self._items = list(items)
 
     def filter(self, criterion):
-        self._items = [item for item in self._items if _criterion_matches(item, criterion)]
+        self._items = [
+            item for item in self._items if _criterion_matches(item, criterion)
+        ]
         return self
 
     def order_by(self, *args, **kwargs):
@@ -76,7 +78,9 @@ class FakeDB:
         self.pending.append(obj)
 
     def commit(self):
-        request_ids = {item.request_id for item in self.persisted if item.request_id is not None}
+        request_ids = {
+            item.request_id for item in self.persisted if item.request_id is not None
+        }
         for item in self.pending:
             if item.request_id is not None and item.request_id in request_ids:
                 self.pending.clear()

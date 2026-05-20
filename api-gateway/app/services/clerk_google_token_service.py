@@ -39,7 +39,9 @@ class ClerkGoogleTokenService:
         headers = {"Authorization": f"Bearer {self.settings.clerk_secret_key}"}
 
         try:
-            async with httpx.AsyncClient(timeout=self.settings.request_timeout_seconds) as client:
+            async with httpx.AsyncClient(
+                timeout=self.settings.request_timeout_seconds
+            ) as client:
                 response = await client.get(url, headers=headers)
         except httpx.RequestError as exc:
             raise HTTPException(
@@ -83,7 +85,11 @@ class ClerkGoogleTokenService:
 
         logger = logging.getLogger("api_gateway.clerk_google_token_service")
         try:
-            logger.debug("Clerk oauth_access_tokens payload for clerk_user_id=%s: %s", clerk_user_id, payload)
+            logger.debug(
+                "Clerk oauth_access_tokens payload for clerk_user_id=%s: %s",
+                clerk_user_id,
+                payload,
+            )
         except Exception:
             pass
 
@@ -112,7 +118,9 @@ class ClerkGoogleTokenService:
             )
 
         try:
-            logger.debug("Parsed Google tokens for clerk_user_id=%s: %s", clerk_user_id, tokens)
+            logger.debug(
+                "Parsed Google tokens for clerk_user_id=%s: %s", clerk_user_id, tokens
+            )
         except Exception:
             pass
 
@@ -191,7 +199,11 @@ class ClerkGoogleTokenService:
 
         # Log token for testing purposes (prints in the gateway terminal)
         try:
-            self.logger.debug("Obtained Google token for clerk_user_id=%s: %s", clerk_user_id, selected_token)
+            self.logger.debug(
+                "Obtained Google token for clerk_user_id=%s: %s",
+                clerk_user_id,
+                selected_token,
+            )
         except Exception:
             # Never raise because of logging
             pass

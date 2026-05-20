@@ -22,17 +22,17 @@ from app.schemas import (
 logger = logging.getLogger(__name__)
 
 EXCHANGE = "kairos.events"
-QUEUE    = "agent.eventos"
+QUEUE = "agent.eventos"
 
 CONSUMED_EVENTS = [
-    "Task.Completed",             # → episódica
-    "Task.Ditch",                 # → episódica
-    "Stats.SummaryGenerated",     # → semántica
-    "GoogleFit.SleepSynced",      # → episódica
-    "GoogleFit.ActivitySynced",   # → episódica
-    "Calendar.EventsUpdated",     # → episódica
-    "Schedule.BlockAccepted",     # → procedimental
-    "Schedule.BlockRejected",     # → procedimental
+    "Task.Completed",  # → episódica
+    "Task.Ditch",  # → episódica
+    "Stats.SummaryGenerated",  # → semántica
+    "GoogleFit.SleepSynced",  # → episódica
+    "GoogleFit.ActivitySynced",  # → episódica
+    "Calendar.EventsUpdated",  # → episódica
+    "Schedule.BlockAccepted",  # → procedimental
+    "Schedule.BlockRejected",  # → procedimental
 ]
 
 
@@ -76,7 +76,9 @@ def _handle_stats_summary(data: dict) -> None:
     evento = StatsSummaryEvent(**data)
     tasa = round(
         (evento.completadas / evento.total_actividades * 100)
-        if evento.total_actividades > 0 else 0, 1
+        if evento.total_actividades > 0
+        else 0,
+        1,
     )
     texto = (
         f"Resumen {evento.periodo} del usuario (período: {evento.fecha_inicio}): "
@@ -140,8 +142,7 @@ def _handle_calendar_events(data: dict) -> None:
         for e in evento.eventos
     )
     texto = (
-        f"Eventos de Google Calendar del usuario para el {evento.fecha}:\n"
-        f"{eventos_str}"
+        f"Eventos de Google Calendar del usuario para el {evento.fecha}:\n{eventos_str}"
     )
     upsert_documento(
         doc_id=f"{evento.id_usuario}_calendar_{evento.fecha}",
@@ -191,14 +192,14 @@ def _handle_block_rejected(data: dict) -> None:
 
 
 HANDLERS = {
-    "Task.Completed":           _handle_task_completed,
-    "Task.Ditch":               _handle_task_ditch,
-    "Stats.SummaryGenerated":   _handle_stats_summary,
-    "GoogleFit.SleepSynced":    _handle_googlefit_sleep,
+    "Task.Completed": _handle_task_completed,
+    "Task.Ditch": _handle_task_ditch,
+    "Stats.SummaryGenerated": _handle_stats_summary,
+    "GoogleFit.SleepSynced": _handle_googlefit_sleep,
     "GoogleFit.ActivitySynced": _handle_googlefit_activity,
-    "Calendar.EventsUpdated":   _handle_calendar_events,
-    "Schedule.BlockAccepted":   _handle_block_accepted,
-    "Schedule.BlockRejected":   _handle_block_rejected,
+    "Calendar.EventsUpdated": _handle_calendar_events,
+    "Schedule.BlockAccepted": _handle_block_accepted,
+    "Schedule.BlockRejected": _handle_block_rejected,
 }
 
 
@@ -230,8 +231,8 @@ def iniciar_consumidor() -> None:
     while True:
         try:
             parametros = pika.URLParameters(settings.rabbitmq_url)
-            conexion   = pika.BlockingConnection(parametros)
-            canal      = conexion.channel()
+            conexion = pika.BlockingConnection(parametros)
+            canal = conexion.channel()
 
             canal.exchange_declare(
                 exchange=EXCHANGE,

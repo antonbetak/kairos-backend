@@ -44,23 +44,31 @@ def _construir_contexto_rag(id_usuario: str) -> str:
 def _construir_prompt(request: GenerateRequest, contexto_rag: str) -> str:
     fecha_str = request.fecha.strftime("%A %d de %B de %Y")
 
-    tareas_str = "\n".join(
-        f"- [{t.tipo or 'tarea'}] {t.titulo}"
-        f"{f' (límite: {t.fecha_limite.date()})' if t.fecha_limite else ''}"
-        f"{f' (~{t.duracion_estimada_min} min)' if t.duracion_estimada_min else ''}"
-        for t in request.tareas
-    ) or "Sin tareas pendientes."
+    tareas_str = (
+        "\n".join(
+            f"- [{t.tipo or 'tarea'}] {t.titulo}"
+            f"{f' (límite: {t.fecha_limite.date()})' if t.fecha_limite else ''}"
+            f"{f' (~{t.duracion_estimada_min} min)' if t.duracion_estimada_min else ''}"
+            for t in request.tareas
+        )
+        or "Sin tareas pendientes."
+    )
 
-    metas_str = "\n".join(
-        f"- {m.titulo} ({m.progreso_pct:.0f}% completada)"
-        for m in request.metas
-    ) or "Sin metas activas."
+    metas_str = (
+        "\n".join(
+            f"- {m.titulo} ({m.progreso_pct:.0f}% completada)" for m in request.metas
+        )
+        or "Sin metas activas."
+    )
 
-    streaks_str = "\n".join(
-        f"- {s.tipo_habito}: racha actual {s.racha_actual} días"
-        f" (máx {s.racha_maxima})"
-        for s in request.streaks
-    ) or "Sin streaks activos."
+    streaks_str = (
+        "\n".join(
+            f"- {s.tipo_habito}: racha actual {s.racha_actual} días"
+            f" (máx {s.racha_maxima})"
+            for s in request.streaks
+        )
+        or "Sin streaks activos."
+    )
 
     return f"""Eres un asistente de productividad personal para la app Kairos.
 Tu tarea es generar un horario diario óptimo para el usuario basado en su contexto actual y su historial de comportamiento.
@@ -108,7 +116,9 @@ El JSON debe tener esta estructura exacta:
 """
 
 
-def _parsear_respuesta_gemini(texto: str, request: GenerateRequest) -> list[BloqueAgente]:
+def _parsear_respuesta_gemini(
+    texto: str, request: GenerateRequest
+) -> list[BloqueAgente]:
     """Parsea el JSON que devuelve Gemini y lo convierte en BloqueAgente."""
     # Limpiar posibles bloques de código que Gemini a veces agrega
     texto = texto.strip()
@@ -122,14 +132,16 @@ def _parsear_respuesta_gemini(texto: str, request: GenerateRequest) -> list[Bloq
     bloques = []
 
     for item in data.get("bloques", []):
-        bloques.append(BloqueAgente(
-            titulo=item["titulo"],
-            descripcion=item.get("descripcion"),
-            fecha_inicio=datetime.fromisoformat(item["fecha_inicio"]),
-            fecha_fin=datetime.fromisoformat(item["fecha_fin"]),
-            tipo=item["tipo"],
-            razon=item.get("razon"),
-        ))
+        bloques.append(
+            BloqueAgente(
+                titulo=item["titulo"],
+                descripcion=item.get("descripcion"),
+                fecha_inicio=datetime.fromisoformat(item["fecha_inicio"]),
+                fecha_fin=datetime.fromisoformat(item["fecha_fin"]),
+                tipo=item["tipo"],
+                razon=item.get("razon"),
+            )
+        )
 
     return bloques
 
@@ -147,7 +159,8 @@ async def generar_horario(request: GenerateRequest) -> GenerateResponse:
     if n_docs < MIN_DOCS_PARA_RAG:
         logger.info(
             "Usuario %s tiene solo %d docs en ChromaDB, usando fallback",
-            id_usuario, n_docs,
+            id_usuario,
+            n_docs,
         )
         return generar_horario_fallback(request)
 
@@ -158,7 +171,9 @@ async def generar_horario(request: GenerateRequest) -> GenerateResponse:
     prompt = _construir_prompt(request, contexto_rag)
 
     try:
-        logger.info("Llamando a Gemini para usuario %s, fecha %s", id_usuario, request.fecha)
+        logger.info(
+            "Llamando a Gemini para usuario %s, fecha %s", id_usuario, request.fecha
+        )
         response = _client_gemini.models.generate_content(
             model=settings.gemini_model,
             contents=prompt,

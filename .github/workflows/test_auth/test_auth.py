@@ -89,7 +89,11 @@ def _cleanup_user_by_email(email: str) -> None:
     db = None
     try:
         db = SessionLocal()
-        user = db.query(models.User).filter(models.User.email == email).scalar_one_or_none()
+        user = (
+            db.query(models.User)
+            .filter(models.User.email == email)
+            .scalar_one_or_none()
+        )
         if user:
             db.delete(user)
             db.commit()

@@ -139,9 +139,7 @@ async def save_google_token(
     if result["calendar_valid"] and result["fit_valid"]:
         message = "Google token guardado y validado en Calendar y Fit."
     else:
-        message = (
-            "Token recibido, pero uno o más servicios no pudieron validarlo."
-        )
+        message = "Token recibido, pero uno o más servicios no pudieron validarlo."
 
     return GoogleTokenSaveResponse(
         success=result["calendar_valid"] and result["fit_valid"],

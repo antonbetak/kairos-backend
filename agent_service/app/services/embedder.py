@@ -15,11 +15,11 @@ def registrar_tarea_completada(evento: dict) -> None:
     if not id_usuario:
         return
 
-    titulo     = evento.get("titulo", "sin título")
-    tipo       = evento.get("tipo", "tarea")
-    fecha_ini  = evento.get("fecha_inicio")
-    fecha_fin  = evento.get("fecha_fin")
-    hora_comp  = evento.get("completada_en") or datetime.now(timezone.utc).isoformat()
+    titulo = evento.get("titulo", "sin título")
+    tipo = evento.get("tipo", "tarea")
+    fecha_ini = evento.get("fecha_inicio")
+    fecha_fin = evento.get("fecha_fin")
+    hora_comp = evento.get("completada_en") or datetime.now(timezone.utc).isoformat()
 
     # Construir texto descriptivo que el LLM puede interpretar como contexto
     texto = (
@@ -49,8 +49,8 @@ def registrar_tarea_abandonada(evento: dict) -> None:
     if not id_usuario:
         return
 
-    titulo    = evento.get("titulo", "sin título")
-    tipo      = evento.get("tipo", "tarea")
+    titulo = evento.get("titulo", "sin título")
+    tipo = evento.get("tipo", "tarea")
     timestamp = evento.get("timestamp") or datetime.now(timezone.utc).isoformat()
 
     texto = (
@@ -80,15 +80,17 @@ def registrar_resumen_estadisticas(evento: dict) -> None:
     if not id_usuario:
         return
 
-    periodo            = evento.get("periodo", "diario")
-    fecha_inicio       = evento.get("fecha_inicio")
-    total_actividades  = evento.get("total_actividades", 0)
-    completadas        = evento.get("completadas", 0)
-    tiempo_productivo  = evento.get("tiempo_productivo_min", 0)
-    puntuacion         = evento.get("puntuacion_productividad", 0.0)
-    timestamp          = evento.get("timestamp") or datetime.now(timezone.utc).isoformat()
+    periodo = evento.get("periodo", "diario")
+    fecha_inicio = evento.get("fecha_inicio")
+    total_actividades = evento.get("total_actividades", 0)
+    completadas = evento.get("completadas", 0)
+    tiempo_productivo = evento.get("tiempo_productivo_min", 0)
+    puntuacion = evento.get("puntuacion_productividad", 0.0)
+    timestamp = evento.get("timestamp") or datetime.now(timezone.utc).isoformat()
 
-    tasa = round((completadas / total_actividades * 100) if total_actividades > 0 else 0, 1)
+    tasa = round(
+        (completadas / total_actividades * 100) if total_actividades > 0 else 0, 1
+    )
 
     texto = (
         f"Resumen {periodo} del usuario (período: {fecha_inicio}): "

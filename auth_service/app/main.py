@@ -197,20 +197,22 @@ def _profile_from_clerk_claims(payload: dict[str, Any]) -> dict[str, str | None]
     if not clerk_user_id:
         raise HTTPException(status_code=401, detail="Clerk token inválido")
 
-    email = str(
-        payload.get("email")
-        or payload.get("primary_email_address")
-        or payload.get("email_address")
-        or ""
-    ).strip().lower()
+    email = (
+        str(
+            payload.get("email")
+            or payload.get("primary_email_address")
+            or payload.get("email_address")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
 
     first_name = str(payload.get("first_name") or "").strip()
     last_name = str(payload.get("last_name") or "").strip()
     nombre = " ".join(part for part in (first_name, last_name) if part).strip()
     if not nombre:
-        nombre = str(
-            payload.get("full_name") or payload.get("name") or ""
-        ).strip()
+        nombre = str(payload.get("full_name") or payload.get("name") or "").strip()
     nombre = nombre or (email.split("@", 1)[0] if email else "")
 
     return {

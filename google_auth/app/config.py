@@ -75,7 +75,9 @@ class Settings(BaseSettings):
     )
     request_timeout_seconds: float = Field(
         default=20.0,
-        validation_alias=AliasChoices("REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds"),
+        validation_alias=AliasChoices(
+            "REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds"
+        ),
     )
     rabbitmq_url: str = Field(
         default="amqp://guest:guest@rabbitmq:5672/",

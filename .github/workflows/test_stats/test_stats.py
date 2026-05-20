@@ -58,7 +58,9 @@ class FakeQuery:
         self._items = list(items)
 
     def filter(self, criterion):
-        self._items = [item for item in self._items if _criterion_matches(item, criterion)]
+        self._items = [
+            item for item in self._items if _criterion_matches(item, criterion)
+        ]
         return self
 
     def order_by(self, *args, **kwargs):
@@ -144,7 +146,9 @@ class StatsServiceTests(unittest.TestCase):
 
     def test_registrar_tarea_creada_increments_counters(self):
         user = uuid4()
-        estadistica = EstadisticaUsuario(id_usuario=user, tareas_creadas=0, tareas_completadas=0)
+        estadistica = EstadisticaUsuario(
+            id_usuario=user, tareas_creadas=0, tareas_completadas=0
+        )
         self.db.storage[EstadisticaUsuario].append(estadistica)
 
         result = registrar_tarea_creada(self.db, user)
@@ -170,9 +174,18 @@ class StatsServiceTests(unittest.TestCase):
         self.db.storage[RachaUsuario].append(racha)
 
         with (
-            patch("app.services.estadisticas.publicar_racha_actualizada", return_value=True) as racha_pub,
-            patch("app.services.estadisticas.publicar_notificacion_creada", return_value=True) as notif_pub,
-            patch("app.services.estadisticas.publicar_logro_desbloqueado", return_value=True) as logro_pub,
+            patch(
+                "app.services.estadisticas.publicar_racha_actualizada",
+                return_value=True,
+            ) as racha_pub,
+            patch(
+                "app.services.estadisticas.publicar_notificacion_creada",
+                return_value=True,
+            ) as notif_pub,
+            patch(
+                "app.services.estadisticas.publicar_logro_desbloqueado",
+                return_value=True,
+            ) as logro_pub,
         ):
             result = registrar_tarea_completada(self.db, user)
 
@@ -191,7 +204,9 @@ class StatsServiceTests(unittest.TestCase):
     def test_desbloquear_logro_no_duplica(self):
         user = uuid4()
 
-        with patch("app.services.estadisticas.publicar_logro_desbloqueado", return_value=True):
+        with patch(
+            "app.services.estadisticas.publicar_logro_desbloqueado", return_value=True
+        ):
             first = desbloquear_logro_si_no_existe(
                 self.db,
                 user,

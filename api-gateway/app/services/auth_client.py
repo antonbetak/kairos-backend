@@ -19,7 +19,9 @@ settings = get_settings()
 @lru_cache(maxsize=1)
 def _jwks_client() -> PyJWKClient | None:
     if not settings.clerk_jwks_url:
-        logger.debug("CLERK_JWKS_URL is missing, Clerk JWT verification will be disabled.")
+        logger.debug(
+            "CLERK_JWKS_URL is missing, Clerk JWT verification will be disabled."
+        )
         return None
     return PyJWKClient(settings.clerk_jwks_url)
 
@@ -71,7 +73,9 @@ async def _fetch_jwks() -> dict[str, Any] | None:
         return None
 
     try:
-        async with httpx.AsyncClient(timeout=settings.request_timeout_seconds) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.request_timeout_seconds
+        ) as client:
             response = await client.get(settings.clerk_jwks_url)
     except httpx.RequestError:
         return None
@@ -278,7 +282,9 @@ async def verify_token(token: str) -> dict[str, Any] | None:
             return kairos_user
 
     if is_clerk_token:
-        logger.debug("Token appears to be Clerk-issued and did not decode correctly; skipping legacy Kairos verify.")
+        logger.debug(
+            "Token appears to be Clerk-issued and did not decode correctly; skipping legacy Kairos verify."
+        )
         return None
 
     return await _verify_legacy_kairos_token(token)

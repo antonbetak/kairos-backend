@@ -19,6 +19,7 @@ MIN_DOCS_PARA_RAG = 3
 def _es_fallback(id_usuario: str) -> bool:
     """Revisa si hay suficiente historial en ChromaDB para usar RAG."""
     from app.db.chroma import contar_documentos_usuario
+
     return contar_documentos_usuario(id_usuario) < MIN_DOCS_PARA_RAG
 
 
@@ -58,13 +59,15 @@ def _fallback(request: GenerateRequest) -> GenerateResponse:
             inicio + timedelta(minutes=duracion),
             datetime(fecha.year, fecha.month, fecha.day, h_fin, 0),
         )
-        bloques.append(BloqueAgente(
-            titulo=titulo,
-            fecha_inicio=inicio,
-            fecha_fin=fin,
-            tipo=tipo,
-            razon="Horario generado con heurísticas básicas. Mejorará con el tiempo.",
-        ))
+        bloques.append(
+            BloqueAgente(
+                titulo=titulo,
+                fecha_inicio=inicio,
+                fecha_fin=fin,
+                tipo=tipo,
+                razon="Horario generado con heurísticas básicas. Mejorará con el tiempo.",
+            )
+        )
 
     return GenerateResponse(
         id_usuario=request.id_usuario,
@@ -121,7 +124,9 @@ async def generate(request: GenerateRequest):
         bloques = _parsear_bloques(result["messages"])
 
         if not bloques:
-            logger.warning("Grafo no devolvió bloques para usuario %s, usando fallback", id_usuario)
+            logger.warning(
+                "Grafo no devolvió bloques para usuario %s, usando fallback", id_usuario
+            )
             return _fallback(request)
 
         return GenerateResponse(

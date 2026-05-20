@@ -109,13 +109,11 @@ _LEGACY_GOOGLE_REFRESH_HEADERS = {"x-google-refresh", "x-google-refresh-token"}
 
 def _extract_google_headers(request: Request) -> dict[str, str] | None:
     headers: dict[str, str] = {}
-    token = (
-        request.headers.get(_GOOGLE_ACCESS_TOKEN_HEADER)
-        or request.headers.get("X-Google-Token")
+    token = request.headers.get(_GOOGLE_ACCESS_TOKEN_HEADER) or request.headers.get(
+        "X-Google-Token"
     )
-    refresh = (
-        request.headers.get(_GOOGLE_REFRESH_TOKEN_HEADER)
-        or request.headers.get("X-Google-Refresh")
+    refresh = request.headers.get(_GOOGLE_REFRESH_TOKEN_HEADER) or request.headers.get(
+        "X-Google-Refresh"
     )
     if token:
         headers[_GOOGLE_ACCESS_TOKEN_HEADER] = token

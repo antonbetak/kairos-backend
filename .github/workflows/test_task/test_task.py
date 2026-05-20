@@ -104,8 +104,12 @@ class TaskServiceTests(unittest.TestCase):
 
         with (
             patch("app.services.due_warning.SessionLocal", return_value=fake_db),
-            patch("app.services.due_warning.publicar_tarea_due_warning", return_value=True) as warning_pub,
-            patch("app.services.due_warning.publicar_tarea_vencida", return_value=True) as expired_pub,
+            patch(
+                "app.services.due_warning.publicar_tarea_due_warning", return_value=True
+            ) as warning_pub,
+            patch(
+                "app.services.due_warning.publicar_tarea_vencida", return_value=True
+            ) as expired_pub,
         ):
             verificar_vencimientos_pendientes()
 

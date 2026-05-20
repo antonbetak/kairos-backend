@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 # Slots de tiempo predefinidos por tipo de actividad
 # La lógica: hábitos en la mañana, tareas de trabajo en el día, libre al final
 SLOTS_PREDETERMINADOS = [
-    {"hora_inicio": 7,  "hora_fin": 8,  "tipo_preferido": "habito"},
-    {"hora_inicio": 9,  "hora_fin": 11, "tipo_preferido": "tarea"},
+    {"hora_inicio": 7, "hora_fin": 8, "tipo_preferido": "habito"},
+    {"hora_inicio": 9, "hora_fin": 11, "tipo_preferido": "tarea"},
     {"hora_inicio": 11, "hora_fin": 13, "tipo_preferido": "tarea"},
     {"hora_inicio": 15, "hora_fin": 17, "tipo_preferido": "tarea"},
     {"hora_inicio": 17, "hora_fin": 18, "tipo_preferido": "habito"},
@@ -34,9 +34,7 @@ def generar_horario_fallback(request: GenerateRequest) -> GenerateResponse:
     bloques: list[BloqueAgente] = []
 
     # Priorizar streaks activos (racha > 0) para no romperlos
-    habitos_prioritarios = [
-        s for s in request.streaks if s.racha_actual > 0
-    ]
+    habitos_prioritarios = [s for s in request.streaks if s.racha_actual > 0]
 
     # Tareas ordenadas por fecha_limite ascendente (las más urgentes primero)
     tareas_ordenadas = sorted(
@@ -63,26 +61,24 @@ def generar_horario_fallback(request: GenerateRequest) -> GenerateResponse:
 
         slot = SLOTS_PREDETERMINADOS[slot_idx]
         fecha_inicio = datetime(
-            fecha.year, fecha.month, fecha.day,
-            slot["hora_inicio"], 0
+            fecha.year, fecha.month, fecha.day, slot["hora_inicio"], 0
         )
         fecha_fin = fecha_inicio + timedelta(minutes=duracion_item)
 
         # Si la actividad no cabe en el slot, la recortamos al fin del slot
-        limite_slot = datetime(
-            fecha.year, fecha.month, fecha.day,
-            slot["hora_fin"], 0
-        )
+        limite_slot = datetime(fecha.year, fecha.month, fecha.day, slot["hora_fin"], 0)
         if fecha_fin > limite_slot:
             fecha_fin = limite_slot
 
-        bloques.append(BloqueAgente(
-            titulo=titulo_item,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            tipo=tipo_item,
-            razon="Horario generado con heurísticas básicas. Mejorará con el tiempo.",
-        ))
+        bloques.append(
+            BloqueAgente(
+                titulo=titulo_item,
+                fecha_inicio=fecha_inicio,
+                fecha_fin=fecha_fin,
+                tipo=tipo_item,
+                razon="Horario generado con heurísticas básicas. Mejorará con el tiempo.",
+            )
+        )
         slot_idx += 1
 
     return GenerateResponse(
