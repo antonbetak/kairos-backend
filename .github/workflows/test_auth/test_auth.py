@@ -14,6 +14,7 @@ from urllib.request import Request
 from urllib.request import urlopen
 from unittest.mock import patch
 from uuid import uuid4
+from sqlalchemy import select
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -37,6 +38,8 @@ os.environ.setdefault("REDIS_DB", "0")
 
 
 from app import security  # noqa: E402
+from app import models  # noqa: E402
+from app.database import SessionLocal  # noqa: E402
 
 
 AUTH_TEST_BASE_URL = os.getenv("AUTH_TEST_BASE_URL", "http://localhost:8001")
@@ -80,6 +83,19 @@ def _request_json(
     except HTTPError as exc:
         body = exc.read().decode("utf-8")
         return exc.code, json.loads(body) if body else {}, dict(exc.headers.items())
+
+
+def _cleanup_user_by_email(email: str) -> None:
+    db = SessionLocal()
+    try:
+        user = db.execute(
+            select(models.User).where(models.User.email == email)
+        ).scalar_one_or_none()
+        if user:
+            db.delete(user)
+            db.commit()
+    finally:
+        db.close()
 
 
 class AuthSecurityUnitTests(unittest.TestCase):
@@ -160,6 +176,8 @@ class AuthServiceEndToEndTests(unittest.TestCase):
             "email": email,
             "password": password,
         }
+
+        self.addCleanup(_cleanup_user_by_email, email)
 
         register_status, register_body, _ = _request_json(
             "POST", "/auth/register", user_payload
@@ -248,3 +266,49 @@ class AuthServiceEndToEndTests(unittest.TestCase):
         )
         self.assertEqual(status_after_refresh, 200)
         self.assertFalse(bool(status_after_refresh_body["blacklisted"]))
+
+    def test_clerk_sync_creates_and_updates_local_user(self) -> None:
+        unique_suffix = int(time.time() * 1000)
+        email = f"ci-clerk-{unique_suffix}@example.com"
+        clerk_id = f"clerk_{unique_suffix}"
+
+        self.addCleanup(_cleanup_user_by_email, email)
+
+        first_payload = {
+            "clerk_id": clerk_id,
+            "email": email,
+            "nombre": "CI Clerk",
+            "avatar_url": "https://example.com/avatar-1.png",
+        }
+        create_status, create_body, _ = _request_json(
+            "POST", "/auth/clerk/sync", first_payload
+        )
+        self.assertEqual(create_status, 200)
+        self.assertEqual(create_body["email"], email)
+        self.assertEqual(create_body["clerk_id"], clerk_id)
+        self.assertEqual(create_body["avatar_url"], first_payload["avatar_url"])
+
+        update_payload = {
+            "clerk_id": clerk_id,
+            "email": email,
+            "nombre": "CI Clerk Updated",
+            "avatar_url": "https://example.com/avatar-2.png",
+        }
+        update_status, update_body, _ = _request_json(
+            "POST", "/auth/clerk/sync", update_payload
+        )
+        self.assertEqual(update_status, 200)
+        self.assertEqual(update_body["id_usuario"], create_body["id_usuario"])
+        self.assertEqual(update_body["clerk_id"], clerk_id)
+        self.assertEqual(update_body["avatar_url"], update_payload["avatar_url"])
+
+        db = SessionLocal()
+        try:
+            user = db.execute(
+                select(models.User).where(models.User.email == email)
+            ).scalar_one_or_none()
+            self.assertIsNotNone(user)
+            self.assertEqual(user.clerk_id, clerk_id)
+            self.assertEqual(user.avatar_url, update_payload["avatar_url"])
+        finally:
+            db.close()

@@ -13,6 +13,16 @@ from urllib.request import Request
 from urllib.request import urlopen
 from unittest.mock import AsyncMock
 from unittest.mock import patch
+from types import ModuleType
+
+
+fake_pika = ModuleType("pika")
+fake_pika.URLParameters = object
+fake_pika.BlockingConnection = object
+fake_pika.BasicProperties = object
+sys.modules.setdefault("pika", fake_pika)
+
+from fastapi.testclient import TestClient
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -22,7 +32,9 @@ if str(GOOGLE_AUTH_ROOT) not in sys.path:
 
 
 from app.config import Settings  # noqa: E402
+from app.main import app  # noqa: E402
 from app.services.google_oauth import GoogleOAuthService  # noqa: E402
+from app.services.google_oauth import get_google_oauth_service  # noqa: E402
 
 
 GOOGLE_AUTH_TEST_BASE_URL = os.getenv(
@@ -179,6 +191,74 @@ class GoogleOAuthServiceUnitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.tokens.refresh_token, "refresh-token")
         self.assertEqual(response.kairos_user.email, "user@example.com")
         self.assertEqual(response.kairos_tokens.access_token, "kairos-access")
+
+
+class GoogleOAuthRouteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.settings = Settings(
+            google_client_id="client-id",
+            google_client_secret="client-secret",
+            google_redirect_uri="http://localhost/callback",
+            auth_service_url="http://auth_service:8000",
+        )
+        self.service = GoogleOAuthService(self.settings)
+        app.dependency_overrides[get_google_oauth_service] = lambda: self.service
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+
+    def test_clerk_session_route_calls_sync_flow(self) -> None:
+        payload = {
+            "user": {
+                "email": "user@example.com",
+                "name": "CI User",
+                "picture": "https://example.com/avatar.png",
+                "google_id": "google-user-123",
+                "email_verified": True,
+            },
+            "tokens": {
+                "access_token": "google-access",
+                "token_type": "Bearer",
+                "refresh_token": "google-refresh",
+                "id_token": "google-id-token",
+            },
+        }
+
+        with (
+            patch.object(
+                self.service,
+                "_verify_clerk_google_token",
+                AsyncMock(return_value=None),
+            ),
+            patch.object(
+                self.service._auth_sync_bus,
+                "sync_google_user",
+                return_value=(
+                    {
+                        "id_usuario": "11111111-1111-1111-1111-111111111111",
+                        "nombre": "CI User",
+                        "email": "user@example.com",
+                        "handle": "ciuser",
+                        "avatar_url": "https://example.com/avatar.png",
+                    },
+                    {
+                        "access_token": "kairos-access",
+                        "refresh_token": "kairos-refresh",
+                        "token_type": "bearer",
+                        "expires_in": 3600,
+                        "refresh_expires_in": 7200,
+                    },
+                ),
+            ),
+        ):
+            response = self.client.post("/auth/google/clerk/session", json=payload)
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["user"]["email"], "user@example.com")
+        self.assertEqual(body["kairos_user"]["email"], "user@example.com")
+        self.assertEqual(body["kairos_tokens"]["access_token"], "kairos-access")
 
 
 @unittest.skipUnless(RUN_E2E_TESTS, "E2E tests disabled")

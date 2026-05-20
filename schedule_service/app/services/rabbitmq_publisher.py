@@ -184,6 +184,6 @@ def publicar_aviso_tarea_vencida(
         titulo=titulo,
         status="warning",
         id_tarea=id_tarea,
-        mensaje=mensaje,
+        mensaje_evento=mensaje,
         fecha_vencimiento=fecha_vencimiento,
     )
