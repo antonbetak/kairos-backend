@@ -173,7 +173,7 @@ async def _decode_clerk_token(token: str) -> dict[str, Any] | None:
 
 
 async def _sync_clerk_user(profile: dict[str, Any]) -> dict[str, Any] | None:
-    url = f"{settings.google_auth_url.rstrip('/')}/auth/google/clerk/session"
+    url = f"{settings.auth_service_url.rstrip('/')}/auth/clerk/sync"
     headers = {}
     if settings.internal_service_token:
         headers["X-Internal-Token"] = settings.internal_service_token
@@ -200,6 +200,13 @@ async def _sync_clerk_user(profile: dict[str, Any]) -> dict[str, Any] | None:
         "auth_provider": "clerk",
         "clerk_id": user.get("clerk_id") or profile.get("clerk_id"),
     }
+
+
+async def ensure_clerk_user_synced(token: str) -> dict[str, Any] | None:
+    profile = await _decode_clerk_token(token)
+    if not profile:
+        return None
+    return await _sync_clerk_user(profile)
 
 
 async def _verify_legacy_kairos_token(token: str) -> dict[str, Any] | None:

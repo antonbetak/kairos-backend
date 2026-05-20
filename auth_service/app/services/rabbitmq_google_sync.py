@@ -79,6 +79,7 @@ def _sync_google_user(payload: dict[str, object]) -> dict[str, object]:
     email = str(payload.get("email") or "").strip().lower()
     nombre = str(payload.get("nombre") or "").strip()
     picture = payload.get("picture")
+    clerk_id = str(payload.get("clerk_id") or "").strip() or None
 
     if not email:
         raise ValueError("email es requerido")
@@ -98,6 +99,9 @@ def _sync_google_user(payload: dict[str, object]) -> dict[str, object]:
             if picture_value and user.avatar_url != picture_value:
                 user.avatar_url = picture_value
                 updates = True
+            if clerk_id and not user.clerk_id:
+                user.clerk_id = clerk_id
+                updates = True
             if not user.handle:
                 user.handle = _generate_unique_handle(db, user.nombre, user.email)
                 updates = True
@@ -108,6 +112,7 @@ def _sync_google_user(payload: dict[str, object]) -> dict[str, object]:
             user = models.User(
                 nombre=nombre,
                 email=email,
+                clerk_id=clerk_id,
                 handle=_generate_unique_handle(db, nombre, email),
                 avatar_url=str(picture).strip() if picture else None,
                 password_hash=pwd_context.hash(secrets.token_urlsafe(32)),

@@ -6,6 +6,7 @@ import logging
 from app.config import get_settings
 from app.dependencies.auth import obtener_usuario_actual
 from app.services.auth_client import get_clerk_id_from_token
+from app.services.auth_client import ensure_clerk_user_synced
 from app.services.auth_client import is_clerk_token
 from app.services.clerk_google_token_service import (
     ClerkGoogleTokenService,
@@ -231,6 +232,33 @@ async def proxy_calendar_device(path: str, request: Request):
         path=f"/device/{path}",
         timeout=settings.request_timeout_seconds,
     )
+
+
+@router.post("/auth/clerk/sync")
+async def sync_clerk_user(
+    authorization: str | None = Header(default=None),
+):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization with Clerk JWT is required.",
+        )
+
+    token = authorization.removeprefix("Bearer ").strip()
+    if not token or not is_clerk_token(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Clerk token.",
+        )
+
+    synced_user = await ensure_clerk_user_synced(token)
+    if synced_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No fue posible sincronizar el usuario Clerk.",
+        )
+
+    return synced_user
 
 
 @router.api_route("/fit/{path:path}", methods=_ALL_METHODS)
