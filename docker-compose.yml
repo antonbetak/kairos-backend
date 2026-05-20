@@ -452,6 +452,8 @@ services:
       retries: 5
 
   agent_service:
+    profiles:
+      - agent
     build:
       context: ./agent_service
     container_name: kairos-agent-service

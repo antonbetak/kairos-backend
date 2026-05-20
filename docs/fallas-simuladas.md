@@ -1,74 +1,203 @@
 # Fallas simuladas
 
-Resumen: escenarios documentados para probar la resiliencia del sistema (fallos en infra y en proveedores externos), pasos reproducibles y verificación de resultados.
+Este documento describe dos fallas simuladas para demostrar el manejo de errores del backend de Kairos.
 
-Escenarios para probar resiliencia y tolerancia a fallos.
+Las pruebas se ejecutan con Docker Compose y el API Gateway en:
 
-## 1. Caída de RabbitMQ
-
-Objetivo: comprobar que los productores manejan reintentos y que los consumidores vuelven a procesar mensajes cuando RabbitMQ vuelve.
-
-Cómo reproducir:
-
-```bash
-docker compose stop rabbitmq
-# ejecutar operaciones que publiquen eventos (p. ej. crear tareas)
-docker compose start rabbitmq
+```text
+http://localhost:8000
 ```
 
-Verificar:
-- Que no haya pérdida de eventos (o que existan reintentos configurados).
-- Logs de `task_service` mostrando fallo al publicar y reintento.
+---
 
-## 2. Error en Google API (403/401)
+## 1. Falla simulada: base de datos no disponible
 
-Objetivo: comprobar manejo de errores y reintentos cuando Google devuelve errores (token expirado, permisos insuficientes).
+### Objetivo
 
-Cómo reproducir:
-- Usar un `X-Google-Token` inválido o revocado.
-- Crear una tarea con `X-Google-Token` inválido.
+Comprobar qué ocurre cuando un microservicio intenta leer o escribir información, pero su base de datos no está disponible temporalmente.
 
-Verificar:
-- `calendar_service` captura error, registra evento `Schedule.Error` o similar.
-- Notificaciones al usuario si está configurado.
+En esta prueba se usa `task_service`, porque depende de `task_postgres` para guardar y consultar tareas.
 
-## 3. Base de datos no disponible
+### Servicio afectado
 
-Objetivo: verificar que el servicio responde correctamente (500) y que los writes no corruptos no ocurren.
+- `task_service`
+- `task_postgres`
 
-Cómo reproducir:
+### Pasos para simular la falla
+
+1. Levantar el proyecto completo:
 
 ```bash
-docker compose stop postgres
-# llamar endpoint que escribe en BD
-docker compose start postgres
+docker compose up --build
 ```
 
-Verificar:
-- El servicio debe retornar error controlado y logs con stacktrace.
-
-## 4. Expiración de tokens JWT
-
-Objetivo: validar que `auth_service` devuelve `401` y el flujo de refresh funciona correctamente.
-
-Cómo reproducir:
-- Forzar expiración del token (usar token con `exp` corto) o modificar `JWT_LEEWAY`.
-
-Verificar:
-- `GET /auth/me` con token expirado → `401`.  
-- `POST /auth/refresh` con `refresh_token` válido → nuevos tokens.
-
-## 5. Fallo en servicio de terceros: Clerk
-
-Objetivo: comprobar el comportamiento cuando la verificación del token de Clerk o la llamada a la API de Clerk (para obtener `oauth_access_tokens/google`) falla.
-
-Cómo reproducir:
+2. Verificar que el servicio de tareas funciona antes de la falla:
 
 ```bash
-# Simular JWKS no disponible o respuesta 500 desde Clerk
+curl -X GET http://localhost:8000/tasks \
+  -H "Authorization: Bearer <TOKEN>"
 ```
 
-Verificar:
-- El gateway debe responder 502/504 o un error claro y no crear usuarios Kairos automáticamente.
-- Las llamadas a `POST /auth/clerk/sync` deben fallar de forma controlada si Clerk no puede verificarse.
-- Los logs deben contener trazas para facilitar reintentos manuales.
+3. Detener únicamente la base de datos de tareas:
+
+```bash
+docker compose stop task_postgres
+```
+
+4. Intentar consultar o crear una tarea mientras la base de datos está detenida:
+
+```bash
+curl -X GET http://localhost:8000/tasks \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+O bien:
+
+```bash
+curl -X POST http://localhost:8000/tasks \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "titulo": "Tarea con base de datos caída",
+    "descripcion": "Prueba de falla simulada"
+  }'
+```
+
+5. Revisar logs del servicio:
+
+```bash
+docker compose logs -f task_service
+```
+
+6. Restaurar la base de datos:
+
+```bash
+docker compose start task_postgres
+```
+
+7. Volver a consultar tareas:
+
+```bash
+curl -X GET http://localhost:8000/tasks \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+### Resultado esperado
+
+- Mientras `task_postgres` está detenido, `task_service` no puede completar la consulta o escritura.
+- El gateway devuelve un error en vez de responder datos incompletos.
+- En los logs aparece el error de conexión a la base de datos.
+- Cuando `task_postgres` vuelve a iniciar, el servicio recupera su operación normal.
+- No se crean registros corruptos o incompletos durante la falla.
+
+### Evidencia sugerida
+
+- Captura del comando `docker compose stop task_postgres`.
+- Captura de Thunder Client o terminal mostrando error al llamar `/tasks`.
+- Captura de logs de `task_service`.
+- Captura posterior mostrando que `/tasks` vuelve a responder al reiniciar `task_postgres`.
+
+---
+
+## 2. Falla simulada: proceso queda pendiente
+
+### Objetivo
+
+Comprobar que el sistema evita ejecutar dos veces la misma operación cuando una solicitud queda marcada como en proceso.
+
+El backend usa `request_id` e idempotencia para marcar operaciones como `PROCESSING`. Si se repite la misma operación antes de que termine o antes de que expire el bloqueo temporal, el servicio responde con conflicto.
+
+En esta prueba se usa `schedule_service`, porque al crear bloques usa `request_id` y reserva idempotente.
+
+### Servicio afectado
+
+- `schedule_service`
+- Redis, usado para guardar el estado temporal de idempotencia.
+
+### Pasos para simular la falla
+
+1. Levantar el proyecto completo:
+
+```bash
+docker compose up --build
+```
+
+2. Elegir un `request_id` fijo para repetir la misma operación:
+
+```text
+11111111-1111-4111-8111-111111111111
+```
+
+3. Enviar una solicitud para crear un bloque de horario con ese `request_id`:
+
+```bash
+curl -X POST http://localhost:8000/schedule \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "titulo": "Bloque pendiente",
+    "descripcion": "Prueba de proceso pendiente",
+    "fecha_inicio": "2026-05-20T10:00:00",
+    "fecha_fin": "2026-05-20T11:00:00",
+    "tipo": "tarea",
+    "status": "planned"
+  }'
+```
+
+4. Simular que el proceso quedó pendiente escribiendo manualmente el estado `PROCESSING` en Redis con el mismo `request_id`:
+
+```bash
+docker compose exec redis redis-cli set idempotency:schedule:11111111-1111-4111-8111-111111111111 PROCESSING EX 60
+```
+
+5. Repetir inmediatamente la misma solicitud:
+
+```bash
+curl -X POST http://localhost:8000/schedule \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "11111111-1111-4111-8111-111111111111",
+    "titulo": "Bloque pendiente",
+    "descripcion": "Prueba de proceso pendiente",
+    "fecha_inicio": "2026-05-20T10:00:00",
+    "fecha_fin": "2026-05-20T11:00:00",
+    "tipo": "tarea",
+    "status": "planned"
+  }'
+```
+
+6. Revisar logs del servicio:
+
+```bash
+docker compose logs -f schedule_service
+```
+
+7. Esperar a que expire el bloqueo temporal o eliminarlo manualmente:
+
+```bash
+docker compose exec redis redis-cli del idempotency:schedule:11111111-1111-4111-8111-111111111111
+```
+
+### Resultado esperado
+
+- La segunda solicitud con el mismo `request_id` no debe crear otro bloque.
+- El servicio responde con `409 Conflict`.
+- El mensaje esperado es:
+
+```json
+{
+  "detail": "El horario ya se está procesando"
+}
+```
+
+- La operación queda protegida contra duplicados mientras el `request_id` está en estado `PROCESSING`.
+- Al expirar o eliminar el bloqueo en Redis, el sistema puede volver a procesar solicitudes normalmente.
+
+### Evidencia sugerida
+
+- Captura del `request_id` usado.
+- Captura del comando que escribe `PROCESSING` en Redis.
+- Captura de la respuesta `409 Conflict`.
+- Captura de logs de `schedule_service`.
