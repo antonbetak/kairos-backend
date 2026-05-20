@@ -57,7 +57,7 @@ def build_graph():
     builder.add_edge("actualizar_episodica", "kairos_agent")
     builder.add_edge("actualizar_procedimental", "kairos_agent")
 
-    return builder.compile(checkpointer=checkpointer, store=store)
+    return builder.compile()
 
 
 # Instancia global del grafo

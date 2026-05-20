@@ -50,6 +50,20 @@ async def listar_horarios(authorization: str):
     return leer_respuesta(response)
 
 
+async def listar_bloques_agente(id_usuario: str, fecha: str):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{SCHEDULE_SERVICE_URL}/schedule/agent-blocks",
+                headers={"X-User-Id": id_usuario},
+                params={"fecha": fecha},
+            )
+    except httpx.RequestError as error:
+        error_servicio_caido(error)
+
+    return leer_respuesta(response)
+
+
 async def obtener_horario(authorization: str, schedule_id: str):
     try:
         async with httpx.AsyncClient() as client:

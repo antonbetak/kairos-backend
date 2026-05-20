@@ -47,3 +47,14 @@ class ScheduleResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class ScheduleAgentBlockResponse(BaseModel):
+    id: UUID
+    titulo: str
+    descripcion: str | None
+    tipo: str | None
+    estado: str
+    fecha_inicio: datetime
+    fecha_fin: datetime
+    razon: str | None = None

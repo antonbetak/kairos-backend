@@ -4,6 +4,9 @@ import logging
 from contextlib import asynccontextmanager
 from threading import Thread
 
+import os
+from app.config import settings
+
 from fastapi import FastAPI
 
 from app.consumers.rabbitmq_consumer import iniciar_consumidor
@@ -41,6 +44,9 @@ async def lifespan(app: FastAPI):
 
     logger.info("Cerrando agent-service...")
 
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
+os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
 
 app = FastAPI(
     title="Kairos Agent Service",

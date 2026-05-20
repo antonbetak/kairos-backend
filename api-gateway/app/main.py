@@ -17,6 +17,7 @@ from app.services.schedule_client import actualizar_horario
 from app.services.schedule_client import crear_horario
 from app.services.schedule_client import eliminar_horario
 from app.services.schedule_client import generar_horario
+from app.services.schedule_client import listar_bloques_agente
 from app.services.schedule_client import listar_horarios
 from app.services.schedule_client import obtener_horario
 from app.services.schedule_client import rechazar_horario
@@ -168,6 +169,14 @@ async def obtener_horarios(
     usuario=Depends(obtener_usuario_actual),
 ):
     return await listar_horarios(authorization)
+
+
+@app.get("/schedule/agent-blocks")
+async def obtener_bloques_agente(
+    fecha: str,
+    usuario=Depends(obtener_usuario_actual),
+):
+    return await listar_bloques_agente(usuario["id_usuario"], fecha)
 
 
 @app.get("/schedule/{schedule_id}")
