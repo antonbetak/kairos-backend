@@ -5,10 +5,12 @@ from fastapi import Depends
 from fastapi import Header
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 import httpx
 from uuid import UUID
 from uuid import uuid4
+from datetime import date
 from datetime import datetime
 from datetime import timezone
 from threading import Thread
@@ -19,6 +21,7 @@ from app.database import Base
 from app.database import SessionLocal
 from app.database import engine
 from app.schemas import ScheduleCreate
+from app.schemas import ScheduleAgentBlockResponse
 from app.schemas import ScheduleGenerateRequest
 from app.schemas import ScheduleResponse
 from app.schemas import ScheduleUpdate
@@ -100,6 +103,18 @@ def obtener_id_usuario(authorization: str | None = Header(default=None)):
         raise HTTPException(status_code=401, detail="Usuario no autenticado")
 
     return UUID(user_id)
+
+
+def obtener_id_usuario_header(
+    x_user_id: str | None = Header(default=None, alias="X-User-Id"),
+):
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="Usuario no autenticado")
+
+    try:
+        return UUID(x_user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID de usuario inválido")
 
 
 def obtener_token_google(
@@ -391,6 +406,36 @@ def listar_bloques(
     )
 
     return bloques
+
+
+@app.get("/schedule/agent-blocks", response_model=list[ScheduleAgentBlockResponse])
+def listar_bloques_agente(
+    fecha: date,
+    id_usuario: UUID = Depends(obtener_id_usuario_header),
+    db: Session = Depends(get_db),
+):
+    bloques = (
+        db.query(models.ScheduleBlock)
+        .filter(models.ScheduleBlock.id_usuario == id_usuario)
+        .filter(models.ScheduleBlock.status == "propuesto")
+        .filter(func.date(models.ScheduleBlock.fecha_inicio) == fecha)
+        .order_by(models.ScheduleBlock.fecha_inicio.asc())
+        .all()
+    )
+
+    return [
+        ScheduleAgentBlockResponse(
+            id=bloque.id,
+            titulo=bloque.titulo,
+            descripcion=bloque.descripcion,
+            tipo=bloque.tipo,
+            estado=bloque.status,
+            fecha_inicio=bloque.fecha_inicio,
+            fecha_fin=bloque.fecha_fin,
+            razon=None,
+        )
+        for bloque in bloques
+    ]
 
 
 @app.get("/schedule/{schedule_id}", response_model=ScheduleResponse)
